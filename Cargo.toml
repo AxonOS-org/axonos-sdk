@@ -1,0 +1,69 @@
+[package]
+name = "axonos-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["Denis Yermakou <axonosorg@gmail.com>"]
+description = "Public SDK for AxonOS: Cognitive Operating System for BCI and AI bridging."
+repository = "https://github.com/AxonOS-org/axonos-sdk"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["bci", "os", "neurotech", "ffi", "async"]
+categories = ["os", "hardware-support", "science"]
+
+[lib]
+# rlib: for use in other Rust projects
+# cdylib: for creating dynamic libraries (.so/.dll/.dylib) for FFI (C/C++/Python)
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = ["async", "c-ffi"]
+async = ["dep:tokio", "dep:futures"]
+c-ffi = ["dep:libc"]
+# Flag for future direct integration with Python ML models
+python-interop = ["dep:pyo3"] 
+
+[dependencies]
+# --- Serialization and Parsing ---
+serde = { version = "1.0", features = ["derive"] }
+# bincode is ideal for BCI: binary, ultra-fast, zero-copy
+bincode = "1.3" 
+serde_json = "1.0"
+
+# --- Async Runtime and Threads ---
+# Used optionally if the SDK is built with the "async" feature
+tokio = { version = "1.36", features = ["rt-multi-thread", "sync", "time", "net", "macros"], optional = true }
+futures = { version = "0.3", optional = true }
+
+# --- Efficient memory buffer handling (for EEG signals) ---
+bytes = "1.5"
+
+# --- Error Handling ---
+# For libraries, strictly use thiserror (no anyhow, to avoid breaking error types for the caller)
+thiserror = "1.0"
+
+# --- Logging and Telemetry ---
+# tracing is faster and more flexible than standard log, especially in an async context
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --- FFI (Foreign Function Interface) ---
+libc = { version = "0.2", optional = true }
+# PyO3 for creating Python bindings (calling Rust from Python for the ML layer)
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+
+[build-dependencies]
+# Automatic C header (.h) generation when building cdylib
+cbindgen = "0.26"
+
+[dev-dependencies]
+# Dependencies strictly for the tests/ and examples/ folders
+tokio = { version = "1.36", features = ["full"] }
+anyhow = "1.0"
+
+# --- Compilation profiles for maximum speed ---
+[profile.release]
+opt-level = 3       # Maximum optimization (O3)
+lto = "fat"         # Link Time Optimization (reduces binary size, speeds up code)
+codegen-units = 1   # Slows down compilation but provides maximum execution speed
+panic = "abort"     # In a bare-metal/FFI context, panics must hard-crash the process without stack unwinding
+strip = true        # Removes debug symbols to reduce binary size
