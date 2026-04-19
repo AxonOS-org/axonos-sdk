@@ -1,45 +1,44 @@
-<div align="center">
+<!--
+SPDX-License-Identifier: Apache-2.0 OR MIT
+Copyright (c) 2026 Denis Yermakou / AxonOS
+-->
 
-# AxonOS SDK
+<p align="center">
+  <a href="https://axonos.org">
+    <img src="https://axonos.org/icon-512.png" width="96" height="96" alt="AxonOS">
+  </a>
+</p>
 
-### Build BCI applications on a deterministic cognitive OS
+<h1 align="center">axonos-sdk</h1>
 
-Public Rust SDK for the AxonOS platform — typed `IntentObservation` events, capability-based neural permissions, and WASM sandbox host bindings. For developers building on the first bare-metal microkernel designed for brain-computer interfaces.
+<p align="center">
+  <strong>The application-facing SDK for the AxonOS cognitive operating system.</strong><br>
+  Typed intent events, capability manifests, and MMP consent integration for brain-computer interface applications.
+</p>
 
-[![Crates.io](https://img.shields.io/crates/v/axonos-sdk?style=for-the-badge&logo=rust&color=dea584)](https://crates.io/crates/axonos-sdk)
-[![docs.rs](https://img.shields.io/docsrs/axonos-sdk?style=for-the-badge&logo=docs.rs)](https://docs.rs/axonos-sdk)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue?style=for-the-badge)](#licence)
-[![CI](https://img.shields.io/github/actions/workflow/status/AxonOS-org/axonos-sdk/ci.yml?style=for-the-badge&logo=github)](https://github.com/AxonOS-org/axonos-sdk/actions)
-
-[![Rust](https://img.shields.io/badge/Rust-2021-dea584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![MSRV](https://img.shields.io/badge/MSRV-1.75-orange?style=flat-square)](https://github.com/AxonOS-org/axonos-sdk/blob/main/Cargo.toml)
-[![FFI](https://img.shields.io/badge/FFI-C%20%7C%20Python-informational?style=flat-square)](#language-bindings)
-[![async](https://img.shields.io/badge/async-tokio-8A2BE2?style=flat-square)](https://tokio.rs/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)]()
-[![no\_alloc](https://img.shields.io/badge/RT%20path-zero%20alloc-success?style=flat-square)](#zero-allocation-guarantee)
-
-[Website](https://axonos.org) · [Documentation](https://docs.rs/axonos-sdk) · [Examples](examples/) · [Medium](https://medium.com/@AxonOS) · [LinkedIn](https://www.linkedin.com/in/axonos)
-
-</div>
-
----
-
-## What this SDK is
-
-The AxonOS kernel processes 8-channel EEG on bare-metal ARM Cortex-M33 with a verified worst-case execution time of **618 µs** and **2.4 µs RMS jitter** — see [Benchmark Report](https://medium.com/@AxonOS/axonos-mvp-the-benchmark-report-latency-power-ea6c78d0e091). The kernel is `#![no_std]` Rust running in TrustZone Secure World, with no path from application code to the underlying neural signal.
-
-This SDK is the **public API surface** third-party developers build against:
-
-- Typed `IntentObservation` events — the only output kernel produces
-- Capability manifest authoring and validation
-- WASM host bindings for the application sandbox
-- Async intent stream (tokio) for cognitive app development
-- C FFI bindings for C/C++/Python integration
-- Zero-copy telemetry parsing (serde + bincode)
-
-> **What this SDK is not.** It is not the kernel. The AxonOS microkernel, DSP pipeline, and TrustZone partition are in private repositories during the pre-release phase. This SDK defines what applications see — the kernel implements the other side of the contract.
+<p align="center">
+  <a href="https://crates.io/crates/axonos-sdk"><img src="https://img.shields.io/crates/v/axonos-sdk.svg?label=crates.io&color=blue" alt="crates.io"></a>
+  <a href="https://docs.rs/axonos-sdk"><img src="https://img.shields.io/docsrs/axonos-sdk?label=docs.rs" alt="docs.rs"></a>
+  <a href="https://github.com/AxonOS-org/axonos-sdk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/AxonOS-org/axonos-sdk/ci.yml?branch=main&label=ci" alt="CI"></a>
+  <a href="#license"><img src="https://img.shields.io/crates/l/axonos-sdk?color=blueviolet" alt="License: Apache-2.0 OR MIT"></a>
+  <a href="#msrv"><img src="https://img.shields.io/badge/MSRV-1.75-orange" alt="MSRV 1.75"></a>
+  <img src="https://img.shields.io/badge/unsafe-forbidden-success" alt="forbid(unsafe_code)">
+  <img src="https://img.shields.io/badge/no__std-supported-success" alt="no_std supported">
+</p>
 
 ---
+
+## What this is
+
+`axonos-sdk` is the **public contract** between a brain-computer interface application and the [AxonOS](https://axonos.org) kernel. Applications receive typed, cryptographically attested **intent observations** — not raw neural signals. This boundary is fundamental: raw EEG never crosses the partition to the application side.
+
+If you are building on AxonOS, this is the crate you add to `Cargo.toml`.
+
+## What this isn't
+
+- Not a signal-processing library. The classifier, spatial filters, and artifact rejection live in the AxonOS kernel and are not part of this SDK.
+- Not a medical device. This SDK is software tooling; a shippable BCI requires a certified kernel, qualified toolchain, and full IEC 62304 lifecycle documentation.
+- Not a direct interface to Neuralink, Synchron, or any other specific BCI device. AxonOS defines its own open reference hardware and an open protocol stack.
 
 ## Install
 
@@ -48,332 +47,155 @@ This SDK is the **public API surface** third-party developers build against:
 axonos-sdk = "0.1"
 ```
 
-With feature flags:
+For hosted (std) builds with full I/O:
 
 ```toml
 [dependencies]
-axonos-sdk = { version = "0.1", features = ["async", "c-ffi"] }
+axonos-sdk = { version = "0.1", features = ["std", "serde"] }
 ```
 
-| Feature | Default | Description |
-|:---|:---:|:---|
-| `async` | ✓ | Tokio runtime integration for non-blocking intent streams |
-| `c-ffi` | ✓ | C header generation via cbindgen, `#[no_mangle]` exports |
-| `python-interop` | — | PyO3 bindings for Python ML layer (experimental) |
+For bare-metal Cortex-M:
 
----
+```toml
+[dependencies]
+axonos-sdk = { version = "0.1", default-features = false }
+```
+
+## Feature flags
+
+| Feature | Default | What it enables |
+|:---|:---:|:---|
+| `std` | — | `std::error::Error` impls, `thiserror`, local IPC connection, `InMemoryFixture` |
+| `alloc` | — | Heap allocation without `std` — for Cortex-M33 with a global allocator |
+| `serde` | — | Serde serialization for intent events (JSON / CBOR wire formats) |
+| `zerocopy` | — | Zero-copy deserialization helpers for FFI and ring buffers |
+
+The default build is `no_std` with no heap allocation — suitable for the STM32F407/STM32H573 application partition.
 
 ## Quickstart
 
-### Reading intent observations
-
 ```rust
-use axonos_sdk::{IntentStream, IntentKind, ObservationFilter};
+use axonos_sdk::{Capability, Direction, IntentKind, IntentStream, Manifest};
 
-#[tokio::main]
-async fn main() -> Result<(), axonos_sdk::Error> {
-    // Connect to AxonOS kernel via NSC gateway
-    let stream = IntentStream::connect("axonos://local").await?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Declare what the app is allowed to observe.
+    let manifest = Manifest::builder()
+        .app_id("com.example.cursor")?
+        .capability(Capability::Navigation)
+        .max_rate_hz(50)
+        .build()?;
 
-    // Filter: only motor imagery, confidence > 0.85
-    let filter = ObservationFilter::new()
-        .kind(IntentKind::NavigationIntent)
-        .min_confidence(0.85);
+    // Connect to the local kernel.
+    let mut stream = IntentStream::connect(&manifest)?;
 
-    let mut observations = stream.subscribe(filter).await?;
-
-    while let Some(obs) = observations.next().await {
-        println!(
-            "Intent: {:?} (confidence: {:.2}, t: {} µs)",
-            obs.intent_id, obs.posterior, obs.timestamp_us
-        );
-        // HMAC-SHA256 tag verified by kernel before delivery
+    while let Some(obs) = stream.try_next()? {
+        if let IntentKind::Direction(d) = obs.kind() {
+            println!("cursor: {:?} (confidence {:.0}%)", d, obs.confidence() * 100.0);
+        }
     }
     Ok(())
 }
 ```
 
-### Declaring capabilities
+Run the examples:
 
-Every AxonOS application ships a signed manifest. Capabilities an application does not declare **do not exist** in its WASM execution environment — enforcement is structural, not policy-based.
-
-```toml
-# axonos-app.toml
-[app]
-name = "mind-cursor"
-version = "1.0.0"
-signer = "ed25519:MCowBQYDK2VwAyEA..."
-
-[capabilities]
-NavigationIntents = { min_confidence = 0.80 }
-SessionQuality   = { }
-# RawEEG, EmotionState, CognitiveProfile — NOT requestable
+```sh
+cargo run --example hello_intent --features std
+cargo run --example mind_cursor --features "std serde"
+cargo run --example focus_monitor --features std
+cargo run --example mesh_coupling --features "std serde"
+cargo build --example bare_metal_no_std --no-default-features
 ```
 
-```rust
-use axonos_sdk::manifest::{Manifest, Capability};
+## Capability model
 
-let manifest = Manifest::load("axonos-app.toml")?;
-manifest.verify_signature()?;
-let caps: Vec<Capability> = manifest.capabilities();
-```
+An AxonOS application declares what it is **authorized to observe** in its `Manifest`. The kernel will reject manifests that request capabilities outside the public set below — there is no escape hatch for "give me raw EEG," by design.
 
----
+| Capability | Event class | Kernel rate limit |
+|:---|:---|:---:|
+| `Navigation` | Direction events for cursor/menu control | 50 Hz |
+| `WorkloadAdvisory` | Cognitive load (low/moderate/high) | 1 Hz |
+| `SessionQuality` | Signal-quality indicator | 2 Hz |
+| `ArtifactEvents` | Electrode / artifact notifications | 10 Hz |
 
-## Core types
+**Explicitly prohibited** (kernel-rejected): raw EEG, continuous emotion inference, cognitive profile read, re-identification. These align with the UNESCO 2025 Recommendation on the Ethics of Neurotechnology §III.
 
-### `IntentObservation`
+## Privacy guarantees
 
-The only event type the kernel emits. Every observation is cryptographically attested and bounded to a capability the application has declared.
+The SDK encodes, at the type level, what an AxonOS application can and cannot see:
 
-| Field | Type | Description |
-|:---|:---|:---|
-| `intent_id` | `IntentKind` | Typed discriminant — see [capability classes](#capability-classes) |
-| `posterior` | `f32` | Posterior probability in `[0.0, 1.0]` (Q16 internally) |
-| `timestamp_us` | `u64` | Microsecond-precision kernel timestamp |
-| `session_id` | `[u8; 16]` | Opaque session identifier (not biometric) |
-| `hmac_sha256` | `[u8; 32]` | Attestation tag, verified by kernel pre-delivery |
+- **No raw signal APIs.** There is no function in this crate that returns EEG samples. There cannot be, because the kernel never sends them across the partition.
+- **Rate limits are structural.** `Capability::kernel_rate_limit_hz()` returns the maximum event rate the kernel policy will deliver. Applications that declare a higher rate are rejected at handshake.
+- **Observations are attested.** Every [`IntentObservation`](https://docs.rs/axonos-sdk/latest/axonos_sdk/struct.IntentObservation.html) carries a truncated HMAC-SHA256 tag. Unattested events are rejected at the SDK boundary with [`Error::AttestationFailed`](https://docs.rs/axonos-sdk/latest/axonos_sdk/enum.Error.html) (terminal).
+- **Withdrawal is terminal.** When the user withdraws consent via the [`MeshClient`](https://docs.rs/axonos-sdk/latest/axonos_sdk/mesh/struct.MeshClient.html) or a hardware button, the stream returns [`Error::ConsentWithdrawn`](https://docs.rs/axonos-sdk/latest/axonos_sdk/enum.Error.html) and will not resume without a fresh handshake. This follows MMP Consent Extension v0.1.0 §4.1.
 
-### `IntentKind`
+## Integration with the MMP Consent Extension
 
-```rust
-pub enum IntentKind {
-    NavigationIntent(Direction),  // 85–95% accuracy, motor imagery 2-class
-    WorkloadAdvisory(Load),       // ~70% accuracy, binary cognitive load
-    SessionQuality(Quality),      // discrete: signal-to-noise, electrode contact
-    ArtifactEvent(ArtifactType),  // EMG, eye-blink, motion artifacts
-}
-```
+[`axonos-sdk::mesh::MeshClient`](https://docs.rs/axonos-sdk/latest/axonos_sdk/mesh/struct.MeshClient.html) provides a typed facade for the four core consent operations:
 
----
+| SDK call | MMP frame | Spec section |
+|:---|:---|:---:|
+| `withdraw_consent(Peer(x), reason)` | `consent-withdraw` scope=peer | §3.1 |
+| `withdraw_consent(All, reason)` | `consent-withdraw` scope=all | §3.1 |
+| `suspend_consent(scope)` | `consent-suspend` | §3.2 |
+| `resume_consent(scope)` | `consent-resume` | §3.3 |
 
-## Capability classes
+The actual wire implementation lives in [`axonos-consent`](https://crates.io/crates/axonos-consent) — `#![no_std]`, zero-allocation, 15/15 interop vectors passing against an independent Node.js implementation.
 
-Applications declare capabilities at install time. The kernel binds only declared capabilities to the WASM instance — unrequested functions are absent from the execution environment.
+## Error taxonomy
 
-### Available
+All fallible operations return `Result<T, Error>`. Errors are layered:
 
-| Capability | Accuracy | Granularity |
-|:---|:---:|:---|
-| `NavigationIntents` | 85–95% | Motor imagery 2-class (left/right) |
-| `WorkloadAdvisory` | ~70% | Binary cognitive load (high/low) |
-| `SessionQuality` | Discrete | Electrode contact, signal-to-noise |
-| `ArtifactEvents` | Event-based | EMG, eye-blink, motion artifacts |
+- **L1 — transport**: `TransportUnreachable`, `AbiMismatch`
+- **L2 — capability/quota**: `CapabilityNotDeclared`, `ManifestRejected`, `RateLimitExceeded`
+- **L3 — consent**: `ConsentSuspended` (non-terminal), `ConsentWithdrawn` (terminal)
+- **L4 — protocol**: `Protocol(ProtocolFault)`, `AttestationFailed`, `StreamOverflow`
 
-### Not requestable
+Use `Error::is_terminal()` to decide whether to tear down the subscription or retry.
 
-| Capability | Reason |
-|:---|:---|
-| `RawEEG` | Architectural boundary — no API exposed to Non-Secure World |
-| `EmotionState` | 60–70% accuracy, insufficient for informed consent |
-| `FlowState` | Not reliably detectable in real-time |
-| `CognitiveProfile` | Prohibited by design |
+## MSRV
 
-Full architecture: [Articles #3, #7, #9, #10](https://medium.com/@AxonOS) on Medium.
+**Rust 1.75.0** (December 28, 2023). Tested in CI on 1.75, stable, and beta.
 
----
+## Safety and correctness
 
-## Language bindings
+- `#![forbid(unsafe_code)]` at the crate root — **no `unsafe` blocks anywhere in this SDK**.
+- `#![warn(missing_docs)]` — every public item is documented.
+- `#![warn(clippy::pedantic)]` — full pedantic lint pass on CI.
+- Compile-time layout assertion: `IntentObservation` is **exactly 32 bytes**.
+- Unit tests for every public type; integration tests via `InMemoryFixture`.
+- Property tests (proptest) on state transitions.
+- Criterion benchmarks on the hot path.
 
-### C / C++
+## Enterprise support
 
-Headers auto-generated via [cbindgen](https://github.com/mozilla/cbindgen) during `cargo build`:
+A commercial support tier is available for teams building production BCI systems on AxonOS. See [`ENTERPRISE.md`](./ENTERPRISE.md) for details.
 
-```c
-#include <axonos_sdk.h>
+## Status and versioning
 
-int main(void) {
-    axonos_stream_t* stream = axonos_stream_connect("axonos://local");
-    axonos_observation_t obs;
-    while (axonos_stream_next(stream, &obs, 100 /*ms timeout*/) == AXONOS_OK) {
-        printf("Intent: %d, confidence: %.2f\n", obs.intent_id, obs.posterior);
-    }
-    axonos_stream_free(stream);
-    return 0;
-}
-```
-
-### Python (via PyO3)
-
-```python
-import axonos_sdk as ax
-
-stream = ax.IntentStream.connect("axonos://local")
-stream.set_filter(min_confidence=0.85, kind="navigation")
-
-for obs in stream:
-    print(f"Intent: {obs.intent_id}, conf: {obs.posterior:.2f}")
-```
-
-Build Python bindings:
-
-```bash
-cargo build --release --features python-interop
-maturin build --release --features python-interop
-```
-
----
-
-## Protocol integration
-
-AxonOS implements the [**Mesh Memory Protocol (MMP) v0.2.2**](https://sym.bot/spec/mmp) for multi-node BCI deployments. The SDK exposes peer-to-peer cognitive coupling through a type-safe wrapper:
-
-```rust
-use axonos_sdk::mesh::{MeshClient, ConsentScope};
-
-let mesh = MeshClient::new("wss://sym-relay.onrender.com").await?;
-
-// Withdraw consent from specific peer — triggers hardware DAC gate closure
-// per MMP Consent Extension v0.1.0, typically <10 µs end-to-end
-mesh.withdraw_consent(peer_id, ConsentScope::Peer).await?;
-```
-
-The Consent Extension enforces consent at **Layer 2** (Connection), below the SVAF coupling engine ([arXiv:2604.03955](https://arxiv.org/abs/2604.03955)). Reference implementation: [axonos-consent](https://github.com/AxonOS-org/axonos-consent).
-
----
-
-## Zero-allocation guarantee
-
-All real-time paths in this SDK are allocation-free. The `IntentObservation` type implements `Copy` (32 bytes, Plain Old Data). The async stream uses a bounded `tokio::sync::mpsc` channel with a fixed capacity — no unbounded queues, no heap growth under backpressure.
-
-```rust
-use axonos_sdk::{IntentStream, StreamConfig};
-
-let config = StreamConfig::default()
-    .channel_capacity(64)       // bounded, compile-time-sized-looking
-    .overflow(OverflowPolicy::DropOldest);  // explicit, never block sender
-
-let stream = IntentStream::with_config(config).await?;
-```
-
-The `serde` + `bincode` deserialization uses zero-copy slice borrows where possible — `Observation<'a>` holds references into the original buffer, no heap copy.
-
----
-
-## Performance characteristics
-
-Measured on x86_64 Linux, Rust 1.75, release profile (LTO fat, codegen-units = 1):
-
-| Operation | p50 | p99 | Notes |
-|:---|:---:|:---:|:---|
-| `IntentObservation::verify_hmac` | 1.1 µs | 2.3 µs | Software SHA-256 |
-| `Manifest::verify_signature` | 85 µs | 120 µs | Ed25519, one-shot at load |
-| `IntentStream::next` (tokio) | 0.3 µs | 0.9 µs | Channel receive, no allocation |
-| C FFI entry/exit overhead | 12 ns | 28 ns | `#[no_mangle]` extern "C" |
-
-Kernel-side timing (Cortex-M33 @ 120 MHz): **618 µs WCET** pipeline, **2.4 µs RMS jitter**. See [Article #12 — Benchmark Report](https://medium.com/@AxonOS/axonos-mvp-the-benchmark-report-latency-power-ea6c78d0e091).
-
----
-
-## Error handling
-
-This SDK follows Rust library conventions — `thiserror` for typed errors, no `anyhow` (which would leak error types to callers):
-
-```rust
-use axonos_sdk::Error;
-
-match stream.next().await {
-    Ok(obs) => handle(obs),
-    Err(Error::HmacMismatch) => {
-        // Attestation failed — kernel detected tampering
-        log::error!("Consent revoked: attestation failure");
-    }
-    Err(Error::ConsentWithdrawn { peer_id }) => {
-        // MMP Consent Extension — peer withdrew
-        log::info!("Peer {} withdrew consent", peer_id);
-    }
-    Err(Error::CapabilityDenied { requested, granted }) => {
-        // Manifest did not declare this capability
-        log::warn!("Need {requested:?}, have {granted:?}");
-    }
-    Err(e) => log::error!("Stream error: {}", e),
-}
-```
-
----
-
-## Examples
-
-| Example | Description |
-|:---|:---|
-| [`examples/hello_intent.rs`](examples/hello_intent.rs) | Minimal intent subscriber |
-| [`examples/mind_cursor.rs`](examples/mind_cursor.rs) | Motor imagery → screen cursor mapping |
-| [`examples/focus_monitor.rs`](examples/focus_monitor.rs) | Cognitive load telemetry with privacy-preserving aggregation |
-| [`examples/mesh_coupling.rs`](examples/mesh_coupling.rs) | Multi-node BCI via MMP with consent withdrawal |
-| [`examples/c_embedding/`](examples/c_embedding/) | C/C++ integration with cbindgen header |
-| [`examples/python_bridge/`](examples/python_bridge/) | Python ML inference over PyO3 |
-
-Run:
-
-```bash
-cargo run --example hello_intent
-cargo run --example mesh_coupling --features async
-```
-
----
-
-## AxonOS ecosystem
-
-| Repository | Role |
-|:---|:---|
-| [`axonos-sdk`](https://github.com/AxonOS-org/axonos-sdk) | **This crate** — public API for applications |
-| [`axonos-consent`](https://github.com/AxonOS-org/axonos-consent) | MMP Consent Extension (Rust `no_std` reference impl) |
-| [`axon-bci-gateway`](https://github.com/AxonOS-org/axon-bci-gateway) | OpenBCI GUI fork for hardware bring-up |
-| `axonos-kernel` | Bare-metal microkernel (private, pre-release) |
-| `axonos-dsp` | CSP + MDM + Kalman signal processing (private) |
-| `axonos-sim` | Hardware-in-the-loop simulator (private) |
-
----
-
-## Documentation & research
-
-| Resource | Link |
-|:---|:---|
-| API reference | [docs.rs/axonos-sdk](https://docs.rs/axonos-sdk) |
-| Website | [axonos.org](https://axonos.org) |
-| Engineering series (30 articles) | [medium.com/@AxonOS](https://medium.com/@AxonOS) |
-| Benchmark report | [Article #12](https://medium.com/@AxonOS/axonos-mvp-the-benchmark-report-latency-power-ea6c78d0e091) |
-| Protocol collaboration | [Article #39 — MMP with SYM.BOT](https://medium.com/@AxonOS) |
-| SVAF paper (coupling layer) | [arXiv:2604.03955](https://arxiv.org/abs/2604.03955) |
-
----
-
-## Minimum Supported Rust Version
-
-Rust **1.75** (stable). MSRV bumps are treated as **minor** version bumps of this crate.
-
----
+This crate is **`0.1.x`** — the public API is considered stable in practice but reserves the right to minor adjustments before `1.0`. Breaking changes are accompanied by a minor version bump and a `CHANGELOG.md` entry. The MMP Consent Extension version targeted is pinned in [`MMP_CONSENT_VERSION`](https://docs.rs/axonos-sdk/latest/axonos_sdk/constant.MMP_CONSENT_VERSION.html); the kernel ABI version in [`KERNEL_ABI_VERSION`](https://docs.rs/axonos-sdk/latest/axonos_sdk/constant.KERNEL_ABI_VERSION.html).
 
 ## Contributing
 
-Pre-release phase — the public API surface is stabilising. Contributions welcome for:
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version: pull requests welcome; please run `cargo test --all-features && cargo clippy --all-features -- -D warnings && cargo fmt --check` before opening.
 
-- Language bindings (Swift, Kotlin, TypeScript via WASM)
-- Example applications demonstrating capability-bounded neural app patterns
-- Documentation improvements and translations
-- Integration tests against the SDK's public API
+Security issues: see [`SECURITY.md`](./SECURITY.md) — **do not** open public issues for security reports.
 
-Core kernel, DSP pipeline, and TrustZone partition contributions are not accepted via this repo — those live in private pre-release repositories. Open an issue to discuss architecture-level proposals.
+## License
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the [project security policy](SECURITY.md).
+Dual-licensed under [Apache-2.0](./LICENSE-APACHE) or [MIT](./LICENSE-MIT) at your option. Every source file carries an SPDX identifier. Unless you explicitly state otherwise, any contribution you intentionally submit for inclusion in this work shall be dual-licensed as above, without any additional terms or conditions.
 
----
+## Related projects
 
-## Licence
-
-Licensed under either of
-
-- [Apache License, Version 2.0](LICENSE-APACHE)
-- [MIT License](LICENSE-MIT)
-
-at your option. Unless explicitly stated otherwise, any contribution intentionally submitted for inclusion in this work shall be dual licensed as above, without any additional terms or conditions.
+- [`axonos-consent`](https://github.com/AxonOS-org/axonos-consent) — MMP Consent Extension reference implementation.
+- [AxonOS homepage](https://axonos.org)
+- [AxonOS research series](https://medium.com/@AxonOS) — 39 articles documenting the architecture.
+- [SVAF paper (arXiv:2604.03955)](https://arxiv.org/abs/2604.03955) — SYM.BOT's coupling engine, the context in which consent sits.
 
 ---
 
-<div align="center">
-
-**AxonOS. Pure signal. Zero noise.**
-
-[axonos.org](https://axonos.org) · [medium.com/@AxonOS](https://medium.com/@AxonOS) · [linkedin.com/in/axonos](https://www.linkedin.com/in/axonos) · [axonosorg@gmail.com](mailto:axonosorg@gmail.com)
-
-</div>
+<p align="center"><sub>
+  <a href="https://axonos.org">axonos.org</a> ·
+  <a href="https://medium.com/@AxonOS">medium.com/@AxonOS</a> ·
+  <a href="mailto:axonosorg@gmail.com">axonosorg@gmail.com</a>
+</sub></p>

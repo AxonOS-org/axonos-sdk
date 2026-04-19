@@ -1,69 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 [package]
 name = "axonos-sdk"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Denis Yermakou <axonosorg@gmail.com>"]
-description = "Public SDK for AxonOS: Cognitive Operating System for BCI and AI bridging."
+license = "Apache-2.0 OR MIT"
+description = "Public SDK for AxonOS — typed intent events, capability declarations, and mesh consent integration for brain-computer interface applications."
+documentation = "https://docs.rs/axonos-sdk"
 repository = "https://github.com/AxonOS-org/axonos-sdk"
-license = "MIT OR Apache-2.0"
+homepage = "https://axonos.org"
 readme = "README.md"
-keywords = ["bci", "os", "neurotech", "ffi", "async"]
-categories = ["os", "hardware-support", "science"]
+keywords = ["bci", "neurotech", "embedded", "consent", "no-std"]
+categories = ["embedded", "no-std", "hardware-support", "science"]
 
 [lib]
-# rlib: for use in other Rust projects
-# cdylib: for creating dynamic libraries (.so/.dll/.dylib) for FFI (C/C++/Python)
-crate-type = ["rlib", "cdylib"]
+name = "axonos_sdk"
+path = "src/lib.rs"
 
 [features]
-default = ["async", "c-ffi"]
-async = ["dep:tokio", "dep:futures"]
-c-ffi = ["dep:libc"]
-# Flag for future direct integration with Python ML models
-python-interop = ["dep:pyo3"] 
+# Default: no_std, no allocator, suitable for Cortex-M targets.
+default = []
+
+# Enable std-only features (std::error::Error, thiserror derives, collections).
+std = ["thiserror", "dep_alloc"]
+
+# Enable heap allocation (via `alloc` crate) without requiring std.
+# Useful on targets like Cortex-M33 with a global allocator.
+alloc = ["dep_alloc"]
+
+# Enable serde serialization for intent events (JSON / CBOR wire formats).
+serde = ["dep:serde", "dep:serde_repr"]
+
+# Enable zero-copy deserialization helpers.
+zerocopy = ["dep:zerocopy"]
+
+# Internal helper to select alloc in both std and explicit-alloc paths.
+dep_alloc = []
 
 [dependencies]
-# --- Serialization and Parsing ---
-serde = { version = "1.0", features = ["derive"] }
-# bincode is ideal for BCI: binary, ultra-fast, zero-copy
-bincode = "1.3" 
-serde_json = "1.0"
-
-# --- Async Runtime and Threads ---
-# Used optionally if the SDK is built with the "async" feature
-tokio = { version = "1.36", features = ["rt-multi-thread", "sync", "time", "net", "macros"], optional = true }
-futures = { version = "0.3", optional = true }
-
-# --- Efficient memory buffer handling (for EEG signals) ---
-bytes = "1.5"
-
-# --- Error Handling ---
-# For libraries, strictly use thiserror (no anyhow, to avoid breaking error types for the caller)
-thiserror = "1.0"
-
-# --- Logging and Telemetry ---
-# tracing is faster and more flexible than standard log, especially in an async context
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# --- FFI (Foreign Function Interface) ---
-libc = { version = "0.2", optional = true }
-# PyO3 for creating Python bindings (calling Rust from Python for the ML layer)
-pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
-
-[build-dependencies]
-# Automatic C header (.h) generation when building cdylib
-cbindgen = "0.26"
+# Typed error taxonomy — always compiled, thiserror only in std.
+thiserror = { version = "2.0", optional = true }
+# Wire format support (optional, feature-gated).
+serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
+serde_repr = { version = "0.1", optional = true }
+# Zero-copy primitives for FFI + ring buffers.
+zerocopy = { version = "0.8", features = ["derive"], optional = true }
+# Stable hash identifiers.
+siphasher = { version = "1.0", default-features = false }
+# Fixed-size collections for no_std paths.
+heapless = "0.8"
 
 [dev-dependencies]
-# Dependencies strictly for the tests/ and examples/ folders
-tokio = { version = "1.36", features = ["full"] }
-anyhow = "1.0"
+# Integration test runtime.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+# Property-based testing for state machines.
+proptest = "1.5"
+# Criterion for benchmarks.
+criterion = { version = "0.5", features = ["html_reports"] }
 
-# --- Compilation profiles for maximum speed ---
+[[bench]]
+name = "intent_throughput"
+harness = false
+
+[[example]]
+name = "hello_intent"
+required-features = ["std"]
+
+[[example]]
+name = "mind_cursor"
+required-features = ["std", "serde"]
+
+[[example]]
+name = "focus_monitor"
+required-features = ["std"]
+
+[[example]]
+name = "mesh_coupling"
+required-features = ["std", "serde"]
+
+[[example]]
+name = "bare_metal_no_std"
+required-features = []
+
 [profile.release]
-opt-level = 3       # Maximum optimization (O3)
-lto = "fat"         # Link Time Optimization (reduces binary size, speeds up code)
-codegen-units = 1   # Slows down compilation but provides maximum execution speed
-panic = "abort"     # In a bare-metal/FFI context, panics must hard-crash the process without stack unwinding
-strip = true        # Removes debug symbols to reduce binary size
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = true  # for DWARF in release (needed for post-mortem on embedded)
+overflow-checks = true  # cheap in release on Cortex-M, catches arithmetic bugs
+
+[profile.bench]
+debug = true
+lto = "fat"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabihf"]
