@@ -23,7 +23,7 @@ path = "src/lib.rs"
 default = []
 
 # Enable std-only features (std::error::Error, thiserror derives, collections).
-std = ["thiserror", "dep_alloc"]
+std = ["dep:thiserror", "dep_alloc"]
 
 # Enable heap allocation (via `alloc` crate) without requiring std.
 # Useful on targets like Cortex-M33 with a global allocator.
@@ -81,7 +81,7 @@ required-features = ["std", "serde"]
 
 [[example]]
 name = "bare_metal_no_std"
-required-features = []
+required-features = ["std"]
 
 [profile.release]
 opt-level = 3

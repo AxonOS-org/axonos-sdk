@@ -34,9 +34,9 @@ pub const DEFAULT_BUFFER_CAPACITY: usize = 256;
 /// Subscription handle. Dropping this ends the subscription.
 #[derive(Debug)]
 pub struct Subscription {
-    id: SubscriptionId,
+    pub(crate) id: SubscriptionId,
     /// Kept to ensure the stream is closed when the subscription is dropped.
-    _phantom: core::marker::PhantomData<*const ()>,
+    pub(crate) _phantom: core::marker::PhantomData<*const ()>,
 }
 
 impl Subscription {

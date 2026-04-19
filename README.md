@@ -3,12 +3,6 @@ SPDX-License-Identifier: Apache-2.0 OR MIT
 Copyright (c) 2026 Denis Yermakou / AxonOS
 -->
 
-<p align="center">
-  <a href="https://axonos.org">
-    <img src="https://axonos.org/icon-512.png" width="96" height="96" alt="AxonOS">
-  </a>
-</p>
-
 <h1 align="center">axonos-sdk</h1>
 
 <p align="center">
@@ -17,14 +11,14 @@ Copyright (c) 2026 Denis Yermakou / AxonOS
 </p>
 
 <p align="center">
-  <a href="https://crates.io/crates/axonos-sdk"><img src="https://img.shields.io/crates/v/axonos-sdk.svg?label=crates.io&color=blue" alt="crates.io"></a>
-  <a href="https://docs.rs/axonos-sdk"><img src="https://img.shields.io/docsrs/axonos-sdk?label=docs.rs" alt="docs.rs"></a>
-  <a href="https://github.com/AxonOS-org/axonos-sdk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/AxonOS-org/axonos-sdk/ci.yml?branch=main&label=ci" alt="CI"></a>
-  <a href="#license"><img src="https://img.shields.io/crates/l/axonos-sdk?color=blueviolet" alt="License: Apache-2.0 OR MIT"></a>
-  <a href="#msrv"><img src="https://img.shields.io/badge/MSRV-1.75-orange" alt="MSRV 1.75"></a>
+  <img src="https://img.shields.io/badge/status-pre--release-orange" alt="Status: pre-release">
+  <img src="https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blueviolet" alt="License: Apache-2.0 OR MIT">
+  <img src="https://img.shields.io/badge/MSRV-1.75-orange" alt="MSRV 1.75">
   <img src="https://img.shields.io/badge/unsafe-forbidden-success" alt="forbid(unsafe_code)">
   <img src="https://img.shields.io/badge/no__std-supported-success" alt="no_std supported">
 </p>
+
+> **Status: pre-release (0.1.0).** This crate has not yet been published to crates.io. API is considered stable in practice but reserves the right to minor adjustments before 1.0. See the bottom of this file for the honest readiness checklist.
 
 ---
 
@@ -32,7 +26,7 @@ Copyright (c) 2026 Denis Yermakou / AxonOS
 
 `axonos-sdk` is the **public contract** between a brain-computer interface application and the [AxonOS](https://axonos.org) kernel. Applications receive typed, cryptographically attested **intent observations** — not raw neural signals. This boundary is fundamental: raw EEG never crosses the partition to the application side.
 
-If you are building on AxonOS, this is the crate you add to `Cargo.toml`.
+If you are building on AxonOS, this is the crate you add to `Cargo.toml` once it is published.
 
 ## What this isn't
 
@@ -40,7 +34,7 @@ If you are building on AxonOS, this is the crate you add to `Cargo.toml`.
 - Not a medical device. This SDK is software tooling; a shippable BCI requires a certified kernel, qualified toolchain, and full IEC 62304 lifecycle documentation.
 - Not a direct interface to Neuralink, Synchron, or any other specific BCI device. AxonOS defines its own open reference hardware and an open protocol stack.
 
-## Install
+## Install (once published)
 
 ```toml
 [dependencies]
@@ -126,12 +120,12 @@ The SDK encodes, at the type level, what an AxonOS application can and cannot se
 
 - **No raw signal APIs.** There is no function in this crate that returns EEG samples. There cannot be, because the kernel never sends them across the partition.
 - **Rate limits are structural.** `Capability::kernel_rate_limit_hz()` returns the maximum event rate the kernel policy will deliver. Applications that declare a higher rate are rejected at handshake.
-- **Observations are attested.** Every [`IntentObservation`](https://docs.rs/axonos-sdk/latest/axonos_sdk/struct.IntentObservation.html) carries a truncated HMAC-SHA256 tag. Unattested events are rejected at the SDK boundary with [`Error::AttestationFailed`](https://docs.rs/axonos-sdk/latest/axonos_sdk/enum.Error.html) (terminal).
-- **Withdrawal is terminal.** When the user withdraws consent via the [`MeshClient`](https://docs.rs/axonos-sdk/latest/axonos_sdk/mesh/struct.MeshClient.html) or a hardware button, the stream returns [`Error::ConsentWithdrawn`](https://docs.rs/axonos-sdk/latest/axonos_sdk/enum.Error.html) and will not resume without a fresh handshake. This follows MMP Consent Extension v0.1.0 §4.1.
+- **Observations are attested.** Every `IntentObservation` carries a truncated HMAC-SHA256 tag. Unattested events are rejected at the SDK boundary with `Error::AttestationFailed` (terminal).
+- **Withdrawal is terminal.** When the user withdraws consent via the `MeshClient` or a hardware button, the stream returns `Error::ConsentWithdrawn` and will not resume without a fresh handshake. This follows MMP Consent Extension v0.1.0 §4.1.
 
 ## Integration with the MMP Consent Extension
 
-[`axonos-sdk::mesh::MeshClient`](https://docs.rs/axonos-sdk/latest/axonos_sdk/mesh/struct.MeshClient.html) provides a typed facade for the four core consent operations:
+`axonos-sdk::mesh::MeshClient` provides a typed facade for the four core consent operations:
 
 | SDK call | MMP frame | Spec section |
 |:---|:---|:---:|
@@ -140,7 +134,7 @@ The SDK encodes, at the type level, what an AxonOS application can and cannot se
 | `suspend_consent(scope)` | `consent-suspend` | §3.2 |
 | `resume_consent(scope)` | `consent-resume` | §3.3 |
 
-The actual wire implementation lives in [`axonos-consent`](https://crates.io/crates/axonos-consent) — `#![no_std]`, zero-allocation, 15/15 interop vectors passing against an independent Node.js implementation.
+The actual wire implementation lives in [axonos-consent](https://github.com/AxonOS-org/axonos-consent) — `#![no_std]`, zero-allocation, 15/15 interop vectors passing against an independent Node.js implementation.
 
 ## Error taxonomy
 
@@ -155,25 +149,20 @@ Use `Error::is_terminal()` to decide whether to tear down the subscription or re
 
 ## MSRV
 
-**Rust 1.75.0** (December 28, 2023). Tested in CI on 1.75, stable, and beta.
+**Rust 1.75.0** (December 28, 2023).
 
 ## Safety and correctness
 
 - `#![forbid(unsafe_code)]` at the crate root — **no `unsafe` blocks anywhere in this SDK**.
 - `#![warn(missing_docs)]` — every public item is documented.
-- `#![warn(clippy::pedantic)]` — full pedantic lint pass on CI.
+- `#![warn(clippy::pedantic)]` — pedantic lints enabled.
 - Compile-time layout assertion: `IntentObservation` is **exactly 32 bytes**.
 - Unit tests for every public type; integration tests via `InMemoryFixture`.
-- Property tests (proptest) on state transitions.
 - Criterion benchmarks on the hot path.
 
 ## Enterprise support
 
 A commercial support tier is available for teams building production BCI systems on AxonOS. See [`ENTERPRISE.md`](./ENTERPRISE.md) for details.
-
-## Status and versioning
-
-This crate is **`0.1.x`** — the public API is considered stable in practice but reserves the right to minor adjustments before `1.0`. Breaking changes are accompanied by a minor version bump and a `CHANGELOG.md` entry. The MMP Consent Extension version targeted is pinned in [`MMP_CONSENT_VERSION`](https://docs.rs/axonos-sdk/latest/axonos_sdk/constant.MMP_CONSENT_VERSION.html); the kernel ABI version in [`KERNEL_ABI_VERSION`](https://docs.rs/axonos-sdk/latest/axonos_sdk/constant.KERNEL_ABI_VERSION.html).
 
 ## Contributing
 
@@ -183,14 +172,56 @@ Security issues: see [`SECURITY.md`](./SECURITY.md) — **do not** open public i
 
 ## License
 
-Dual-licensed under [Apache-2.0](./LICENSE-APACHE) or [MIT](./LICENSE-MIT) at your option. Every source file carries an SPDX identifier. Unless you explicitly state otherwise, any contribution you intentionally submit for inclusion in this work shall be dual-licensed as above, without any additional terms or conditions.
+Dual-licensed under [Apache-2.0](./LICENSE-APACHE) or [MIT](./LICENSE-MIT) at your option. Every source file carries an SPDX identifier.
 
 ## Related projects
 
-- [`axonos-consent`](https://github.com/AxonOS-org/axonos-consent) — MMP Consent Extension reference implementation.
+- [axonos-consent](https://github.com/AxonOS-org/axonos-consent) — MMP Consent Extension reference implementation.
 - [AxonOS homepage](https://axonos.org)
 - [AxonOS research series](https://medium.com/@AxonOS) — 39 articles documenting the architecture.
 - [SVAF paper (arXiv:2604.03955)](https://arxiv.org/abs/2604.03955) — SYM.BOT's coupling engine, the context in which consent sits.
+
+---
+
+## Pre-release readiness — honest checklist
+
+This section exists so that anyone evaluating the crate knows exactly what state it is in. It will be deleted from the README at the 1.0 release.
+
+**Shipped in this repo:**
+
+- [x] Core types: `IntentObservation` (32-byte, `Copy`, `#[repr(C)]`), `IntentKind`, `Direction`, `Load`, `Quality`
+- [x] Capability model with per-capability kernel rate limits
+- [x] `Manifest` + `ManifestBuilder` with local validation
+- [x] `IntentStream` with `StreamConfig`, `ObservationFilter`, `OverflowPolicy`
+- [x] `MeshClient` facade for MMP Consent Extension operations
+- [x] Full error taxonomy with `ErrorCode` wire codes
+- [x] `#![forbid(unsafe_code)]` at the crate root
+- [x] Dual-license file structure (Apache-2.0 / MIT)
+- [x] 5 example programs
+- [x] Integration test skeleton
+- [x] Criterion benchmark skeleton
+- [x] CI workflow template (`.github/workflows/ci.yml`)
+
+**Pending before 0.1.0 publish to crates.io:**
+
+- [ ] `cargo build --all-features` green on stable Rust
+- [ ] `cargo build --no-default-features` green for the `no_std` path
+- [ ] `cargo test --all-features` green run
+- [ ] `cargo clippy --all-features -- -D warnings` clean
+- [ ] `cargo fmt --check` clean
+- [ ] Build verification on `thumbv7em-none-eabihf` and `thumbv8m.main-none-eabihf` targets
+- [ ] `cargo publish --dry-run` succeeds
+- [ ] Initial CI run green on GitHub Actions
+
+**Pending before 1.0:**
+
+- [ ] Real IPC transport in `host.rs` (currently scripted observations only; wire transport to kernel is a stub)
+- [ ] Real `try_next()` implementation (currently returns `None`; placeholder until kernel endpoint exists)
+- [ ] Published performance numbers from Criterion runs
+- [ ] First downstream user feedback incorporated
+- [ ] Kernel ABI stabilization (coordinated with `axonos-kernel`)
+
+**What this means practically:** the types and API surface are production-quality. The runtime I/O pieces (`connect_local`, `try_next`) are **placeholders** until the AxonOS kernel ships. You can build against this SDK today and your code will compile and run against the `InMemoryFixture`; you cannot yet run against a real AxonOS kernel because one has not been released.
 
 ---
 
