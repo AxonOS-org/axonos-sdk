@@ -23,7 +23,7 @@
 //! application is notified via [`crate::Error::StreamOverflow`] on the
 //! next `next()` call.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::intent::{IntentKind, IntentObservation};
 use crate::manifest::Manifest;
 

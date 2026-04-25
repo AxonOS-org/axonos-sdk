@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 [package]
 name = "axonos-sdk"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.85"
 authors = ["Denis Yermakou <axonosorg@gmail.com>"]
 license = "Apache-2.0 OR MIT"
 description = "Public SDK for AxonOS — typed intent events, capability declarations, and mesh consent integration for brain-computer interface applications."
@@ -19,50 +19,67 @@ name = "axonos_sdk"
 path = "src/lib.rs"
 
 [features]
-# Default: no_std, no allocator, suitable for Cortex-M targets.
+# Default: no_std, no allocator. Suitable for Cortex-M4F (STM32F407) bare metal.
 default = []
 
-# Enable std-only features (std::error::Error, thiserror derives, collections).
-std = ["dep:thiserror", "dep_alloc"]
+# Enable std-only integrations (`std::error::Error` impls via `thiserror`).
+# `std` implies `alloc`.
+std = ["dep:thiserror", "alloc"]
 
-# Enable heap allocation (via `alloc` crate) without requiring std.
-# Useful on targets like Cortex-M33 with a global allocator.
-alloc = ["dep_alloc"]
+# Enable heap allocation (via the `alloc` crate) without requiring `std`.
+# Suitable for Cortex-M33 (STM32H573) with a global allocator.
+# This is a marker feature: source code gates `extern crate alloc` and any
+# allocating constructs behind `#[cfg(feature = "alloc")]`.
+alloc = []
 
-# Enable serde serialization for intent events (JSON / CBOR wire formats).
-serde = ["dep:serde", "dep:serde_repr"]
+# Enable Serde serialization for intent events (JSON / CBOR wire formats).
+# Activates `serde` features on transitive dependencies that store data
+# inside our public types (heapless, siphasher).
+serde = [
+    "dep:serde",
+    "dep:serde_repr",
+    "heapless/serde",
+    "siphasher/serde",
+]
 
-# Enable zero-copy deserialization helpers.
+# Enable zero-copy deserialization helpers for FFI / ring buffer protocols.
 zerocopy = ["dep:zerocopy"]
 
-# Internal helper to select alloc in both std and explicit-alloc paths.
-dep_alloc = []
-
 [dependencies]
-# Typed error taxonomy — always compiled, thiserror only in std.
+# Typed error taxonomy — only in std builds (thiserror requires std).
 thiserror = { version = "2.0", optional = true }
 # Wire format support (optional, feature-gated).
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 serde_repr = { version = "0.1", optional = true }
 # Zero-copy primitives for FFI + ring buffers.
 zerocopy = { version = "0.8", features = ["derive"], optional = true }
-# Stable hash identifiers.
+# Stable hash identifiers (with optional serde support).
 siphasher = { version = "1.0", default-features = false }
-# Fixed-size collections for no_std paths.
+# Fixed-size collections for no_std paths (with optional serde support).
 heapless = "0.8"
 
+# Dev-dependencies: kept at modest versions to keep the test compile fast.
+# MSRV 1.85 supports the modern transitive deps (edition2024) these pull in.
 [dev-dependencies]
 # Integration test runtime.
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "sync", "time"] }
 # Property-based testing for state machines.
 proptest = "1.5"
 # Criterion for benchmarks.
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
 
 [[bench]]
 name = "intent_throughput"
 harness = false
 
+# Examples
+# `hello_intent`, `mind_cursor`, `focus_monitor`, `mesh_coupling` are
+# host-side demonstrations of the application API and require std.
+# `bare_metal_no_std` demonstrates the SDK API on a host build for portability,
+# but the body uses only no_std-compatible APIs. To verify true no_std
+# compilation of the library, build with `cargo build --no-default-features`
+# and cross-compile with `cargo build --target thumbv7em-none-eabihf
+# --no-default-features`. See README §Embedded.
 [[example]]
 name = "hello_intent"
 required-features = ["std"]
@@ -83,14 +100,25 @@ required-features = ["std", "serde"]
 name = "bare_metal_no_std"
 required-features = ["std"]
 
+# Embedded production build profile.
+# `debug = true` retains DWARF for post-mortem analysis on embedded probes
+# (probe-rs / OpenOCD); the symbols are stripped from the final binary by
+# the linker `--strip-debug` flag at flash time. Trade-off documented at
+# https://github.com/AxonOS-org/axonos-rfcs (RFC-0003 §Validation).
 [profile.release]
 opt-level = 3
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-debug = true  # for DWARF in release (needed for post-mortem on embedded)
-overflow-checks = true  # cheap in release on Cortex-M, catches arithmetic bugs
+debug = true
+overflow-checks = true
 
+# Faster dev compile.
+[profile.dev]
+opt-level = 1
+overflow-checks = true
+
+# Benchmarks: maximum optimisation, debug symbols for flamegraph.
 [profile.bench]
 debug = true
 lto = "fat"

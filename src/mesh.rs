@@ -31,6 +31,7 @@ use crate::error::Result;
 /// The AxonOS SDK treats this as an opaque blob; the interpretation is
 /// defined by the MMP base protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PeerId(pub [u8; 16]);
 
 impl PeerId {

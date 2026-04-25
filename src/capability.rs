@@ -90,6 +90,7 @@ impl fmt::Display for Capability {
 /// A set of [`Capability`] values. Implemented as a `u8` bitfield for
 /// zero-allocation storage in [`crate::Manifest`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CapabilitySet(u8);
 
 impl CapabilitySet {

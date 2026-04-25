@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-04-25
+
+Maintenance release. No public API changes; downstream code does not need
+modification (apart from bumping the minimum Rust toolchain).
+
+### Fixed
+
+- **Build with `--features serde` no longer fails.** `Capability`, `CapabilitySet`, and `PeerId` now derive `Serialize`/`Deserialize` under the `serde` feature, and the feature now activates `heapless/serde` and `siphasher/serde` so transitive bounds resolve.
+- **Build with `RUSTFLAGS=-D warnings` is now clean.** Removed unused `Error` import in `stream.rs` (was only referenced from doc comments). Gated `core::fmt` import in `error.rs` under the `#[cfg(not(feature = "std"))]` block where it is actually used.
+- **`FrameTooLarge` error variant** now documents its `size` and `max` fields.
+- **Removed dead `dep_alloc` feature** that was a placeholder activating nothing. The `std` feature now directly implies `alloc`.
+- **Removed dead `extern crate alloc;`** — no source file referenced any `alloc::*` types, so the declaration was unused.
+
+### Changed
+
+- **MSRV bumped from 1.75 to 1.85.** Required because the modern `proptest` and `criterion` dev-dependencies pull in transitive crates that require `edition2024` (stabilised in Rust 1.85). Library users on stable Rust are unaffected; only contributors running the test suite need 1.85+.
+- Cargo profile and feature-flag comments expanded for clarity. Profile rationale (especially `debug = true` on release for embedded probe-rs symbols) now references RFC-0003.
+
+### Maintenance
+
+- All five feature combinations (`default`, `std`, `alloc`, `serde`, `zerocopy`, and their union) verified to build cleanly under `RUSTFLAGS=-D warnings` on the local toolchain matching the CI configuration.
+
 ## [0.1.0] — 2026-04-19
 
 Initial public release.
@@ -31,7 +53,7 @@ Initial public release.
 
 - MMP Consent Extension version targeted: **0.1.0**.
 - AxonOS kernel ABI version: **1**.
-- Minimum supported Rust version (MSRV): **1.75.0**.
+- Minimum supported Rust version (MSRV): **1.85.0**.
 
 [Unreleased]: https://github.com/AxonOS-org/axonos-sdk/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/AxonOS-org/axonos-sdk/releases/tag/v0.1.0

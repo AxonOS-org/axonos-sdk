@@ -19,6 +19,7 @@
 //! the IEC 62304 §5.2.6 requirement that error handling be explicit and
 //! traceable.
 
+#[cfg(not(feature = "std"))]
 use core::fmt;
 
 /// Result type alias used throughout the SDK.
@@ -247,7 +248,12 @@ pub enum ProtocolFault {
     /// A field had an unexpected type.
     InvalidFieldType(&'static str),
     /// The frame size exceeded the maximum allowed.
-    FrameTooLarge { size: u32, max: u32 },
+    FrameTooLarge {
+        /// Observed frame size, in bytes.
+        size: u32,
+        /// Maximum permitted frame size, in bytes.
+        max: u32,
+    },
 }
 
 #[cfg(test)]

@@ -87,9 +87,6 @@
 //! - [Article #12 — Benchmark report](https://medium.com/@AxonOS/axonos-mvp-the-benchmark-report-latency-power-ea6c78d0e091)
 //!   — canonical performance data.
 
-#[cfg(feature = "dep_alloc")]
-extern crate alloc;
-
 // ─── Public module tree ──────────────────────────────────────────────────
 pub mod capability;
 pub mod error;

@@ -13,7 +13,7 @@ Copyright (c) 2026 Denis Yermakou / AxonOS
 <p align="center">
   <img src="https://img.shields.io/badge/status-pre--release-orange" alt="Status: pre-release">
   <img src="https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blueviolet" alt="License: Apache-2.0 OR MIT">
-  <img src="https://img.shields.io/badge/MSRV-1.75-orange" alt="MSRV 1.75">
+  <img src="https://img.shields.io/badge/MSRV-1.85-orange" alt="MSRV 1.85">
   <img src="https://img.shields.io/badge/unsafe-forbidden-success" alt="forbid(unsafe_code)">
   <img src="https://img.shields.io/badge/no__std-supported-success" alt="no_std supported">
 </p>
@@ -149,7 +149,7 @@ Use `Error::is_terminal()` to decide whether to tear down the subscription or re
 
 ## MSRV
 
-**Rust 1.75.0** (December 28, 2023).
+**Rust 1.85.0** (February 20, 2025).
 
 ## Safety and correctness
 
