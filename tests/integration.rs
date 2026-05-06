@@ -15,7 +15,6 @@ use axonos_sdk::{
 fn test_manifest(app: &str) -> Manifest {
     Manifest::builder()
         .app_id(app)
-        .unwrap()
         .capability(Capability::Navigation)
         .capability(Capability::SessionQuality)
         .max_rate_hz(10)
@@ -48,7 +47,6 @@ fn connect_without_fixture_fails_with_transport_error() {
 fn manifest_rejects_rate_over_kernel_limit() {
     let r = Manifest::builder()
         .app_id("com.test.e2e.3")
-        .unwrap()
         .capability(Capability::WorkloadAdvisory) // kernel limit 1 Hz
         .max_rate_hz(100)
         .build();
@@ -59,6 +57,16 @@ fn manifest_rejects_rate_over_kernel_limit() {
     } else {
         panic!("expected ManifestRejected");
     }
+}
+
+#[test]
+fn manifest_rejects_zero_rate() {
+    let r = Manifest::builder()
+        .app_id("com.test.e2e.zero")
+        .capability(Capability::Navigation)
+        .max_rate_hz(0)
+        .build();
+    assert!(r.is_err());
 }
 
 #[test]
@@ -124,6 +132,20 @@ fn capability_set_bitfield_is_compact() {
 }
 
 #[test]
+fn capability_set_u32_width_prevents_overflow() {
+    // If this test compiles, the compile-time assertion in capability.rs
+    // guarantees that all discriminants fit inside a u32 bitfield.
+    use axonos_sdk::CapabilitySet;
+    let s = CapabilitySet::new()
+        .with(Capability::Navigation)
+        .with(Capability::WorkloadAdvisory)
+        .with(Capability::SessionQuality)
+        .with(Capability::ArtifactEvents);
+    assert_eq!(s.len(), 4);
+    assert_eq!(s.as_raw(), 0x0F);
+}
+
+#[test]
 fn observation_size_is_32_bytes() {
     assert_eq!(std::mem::size_of::<IntentObservation>(), 32);
 }
@@ -133,4 +155,17 @@ fn version_constants_surface_correctly() {
     assert_eq!(axonos_sdk::MMP_CONSENT_VERSION, "0.1.0");
     assert!(axonos_sdk::KERNEL_ABI_VERSION >= 1);
     assert!(!axonos_sdk::VERSION.is_empty());
+}
+
+#[test]
+fn manifest_builder_is_infallible_intermediate() {
+    // All builder methods return Self, not Result<Self>.
+    let _builder = Manifest::builder()
+        .app_id("com.test.builder")
+        .name("Test")
+        .vendor("AxonOS")
+        .capability(Capability::Navigation)
+        .max_rate_hz(10);
+    // Only build() can fail.
+    assert!(_builder.build().is_ok());
 }
