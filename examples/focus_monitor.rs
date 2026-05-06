@@ -18,8 +18,8 @@ use axonos_sdk::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = Manifest::builder()
-        .app_id("com.axonos.example.focus")?
-        .name("Focus Monitor")?
+        .app_id("com.axonos.example.focus")
+        .name("Focus Monitor")
         .capability(Capability::WorkloadAdvisory)
         .capability(Capability::SessionQuality)
         .max_rate_hz(1) // respect the 1 Hz kernel limit for WorkloadAdvisory

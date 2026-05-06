@@ -26,25 +26,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("Withdrawing consent for peer {:x?}...", peer_x.as_bytes());
     mesh.withdraw_consent(ConsentScope::Peer(peer_x), WithdrawReason::UserInitiated)?;
-    println!("  ✓ consent-withdraw frame enqueued for emission");
+    println!(" ✓ consent-withdraw frame enqueued for emission");
 
     // Scenario 2: User presses "suspend coupling with everyone" (focus mode).
     println!();
     println!("Suspending consent for all peers (focus mode)...");
     mesh.suspend_consent(ConsentScope::All)?;
-    println!("  ✓ consent-suspend frame enqueued");
+    println!(" ✓ consent-suspend frame enqueued");
 
     // Scenario 3: User resumes coupling.
     println!();
     println!("Resuming consent for all peers...");
     mesh.resume_consent(ConsentScope::All)?;
-    println!("  ✓ consent-resume frame enqueued");
+    println!(" ✓ consent-resume frame enqueued");
 
     // Scenario 4: Safety violation — hardware reports over-temperature.
     println!();
     println!("Safety-triggered withdrawal (over-temperature)...");
     mesh.withdraw_consent(ConsentScope::All, WithdrawReason::HardwareFault)?;
-    println!("  ✓ consent-withdraw(HARDWARE_FAULT) emitted to all peers");
+    println!(" ✓ consent-withdraw(HARDWARE_FAULT) emitted to all peers");
 
     Ok(())
 }

@@ -48,8 +48,8 @@ fn direction_vector(d: Direction) -> (f32, f32) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = Manifest::builder()
-        .app_id("com.axonos.example.cursor")?
-        .name("Mind Cursor")?
+        .app_id("com.axonos.example.cursor")
+        .name("Mind Cursor")
         .capability(Capability::Navigation)
         .capability(Capability::SessionQuality)
         .max_rate_hz(50)
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut fx = InMemoryFixture::new();
     for (t, d, c) in [
         (10_000, Direction::Up, 0.85),
-        (30_000, Direction::Up, 0.35),   // low confidence, should be filtered
+        (30_000, Direction::Up, 0.35), // low confidence, should be filtered
         (50_000, Direction::Right, 0.80),
         (70_000, Direction::Right, 0.75),
         (90_000, Direction::Neutral, 0.50), // below threshold, ignored

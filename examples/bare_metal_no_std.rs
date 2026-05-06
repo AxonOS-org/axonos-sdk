@@ -10,7 +10,7 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run --example bare_metal_no_std --features std
+//! cargo run --example bare_metal_no_std
 //! ```
 //!
 //! Verify `no_std` build of the library itself with:
@@ -33,7 +33,9 @@ fn demo() {
     // Build a manifest — heapless strings, no allocation.
     let manifest = Manifest::builder()
         .app_id("embedded.demo")
-        .and_then(|b| b.capability(Capability::Navigation).max_rate_hz(10).build())
+        .capability(Capability::Navigation)
+        .max_rate_hz(10)
+        .build()
         .expect("static manifest construction should not fail");
 
     // Verify capabilities round-trip.
@@ -50,11 +52,10 @@ fn demo() {
     }
 
     // Stack frame is tiny:
-    //   - IntentObservation = 32 B
-    //   - Manifest with a single capability + short app_id ≈ ~200 B
+    // - IntentObservation = 32 B
+    // - Manifest with a single capability + short app_id ≈ ~200 B
     // Total < 1 KB — fits easily in a Cortex-M4F stack.
-    println!("  IntentObservation:  {} bytes", core::mem::size_of_val(&obs));
-    println!("  Manifest:           {} bytes", core::mem::size_of_val(&manifest));
-    println!("  CapabilitySet:      {} bytes", core::mem::size_of_val(&caps));
+    println!(" IntentObservation: {} bytes", core::mem::size_of_val(&obs));
+    println!(" Manifest: {} bytes", core::mem::size_of_val(&manifest));
+    println!(" CapabilitySet: {} bytes", core::mem::size_of_val(&caps));
 }
-

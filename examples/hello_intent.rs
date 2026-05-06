@@ -15,15 +15,15 @@ use axonos_sdk::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── Build a manifest declaring Navigation capability ──────────────
     let manifest = Manifest::builder()
-        .app_id("com.axonos.example.hello")?
-        .name("Hello Intent")?
-        .vendor("AxonOS")?
+        .app_id("com.axonos.example.hello")
+        .name("Hello Intent")
+        .vendor("AxonOS")
         .capability(Capability::Navigation)
         .max_rate_hz(10)
         .build()?;
 
     println!("Manifest for {} ({:?})", manifest.app_id(), manifest.name());
-    println!("  capabilities: {:?}", manifest.capabilities());
+    println!(" capabilities: {:?}", manifest.capabilities());
 
     // ── Install a scripted fixture for this example ─────────────────
     let mut fx = InMemoryFixture::new();
