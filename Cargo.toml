@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 [package]
 name = "axonos-sdk"
-version = "0.1.1"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.85"
-authors = ["Denis Yermakou "]
+authors = ["Denis Yermakou <denis@axonos.org>"]
 license = "Apache-2.0 OR MIT"
-description = "Public SDK for AxonOS — typed intent events, capability declarations, and mesh consent integration for brain-computer interface applications."
+description = "Hardened BCI SDK — typed intent events, capability declarations, and mesh consent integration."
 documentation = "https://docs.rs/axonos-sdk"
 repository = "https://github.com/AxonOS-org/axonos-sdk"
 homepage = "https://axonos.org"
@@ -20,6 +20,10 @@ path = "src/lib.rs"
 
 [features]
 default = []
+
+# Development-only: allows compilation without kernel ABI.
+# NEVER enable in production builds.
+kernel-stub = []
 
 std = ["dep:thiserror", "alloc"]
 alloc = []
@@ -46,23 +50,23 @@ harness = false
 
 [[example]]
 name = "hello_intent"
-required-features = ["std"]
+required-features = ["std", "kernel-stub"]
 
 [[example]]
 name = "mind_cursor"
-required-features = ["std", "serde"]
+required-features = ["std", "serde", "kernel-stub"]
 
 [[example]]
 name = "focus_monitor"
-required-features = ["std"]
+required-features = ["std", "kernel-stub"]
 
 [[example]]
 name = "mesh_coupling"
-required-features = ["std", "serde"]
+required-features = ["std", "serde", "kernel-stub"]
 
 [[example]]
 name = "bare_metal_no_std"
-required-features = []
+required-features = ["kernel-stub"]
 
 [profile.release]
 opt-level = 3

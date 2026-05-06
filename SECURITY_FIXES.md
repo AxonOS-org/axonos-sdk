@@ -1,38 +1,54 @@
-# Security Fixes — axonos-sdk 0.1.1
+# Security Fixes — axonos-sdk 0.3.0
 
 ## Audit Reference
-- **Auditor:** Independent Rust security review (2026-05-07)
-- **Scope:** `axonos-sdk` main branch, commit range pre-0.1.1
-- **Threat Model:** AxonOS SDK sits at the application side of a trust
-  boundary. An application compromise must not extract raw neural signals,
-  forge observations to other applications, or prevent consent-withdraw
-  from reaching the hardware interlock.
+- **Auditors:** Independent Rust security review (2026-05-07) + embedded/BCI engineer review
+- **Scope:** Full source tree, all commits through 0.2.0
+- **Threat Model:** AxonOS SDK at application/kernel boundary. Compromise must not extract raw EEG, forge observations, or prevent consent-withdraw from reaching hardware interlock.
 
 ## Finding → Fix Mapping
 
-| ID | Severity | Finding | File | Fix Status |
+| ID | Severity | Finding | File | Fix |
 |:---|:---|:---|:---|:---|
-| AUDIT-001 | **Critical** | `CapabilitySet` uses `u8` bitfield; `1 << 8` wraps to 0, silently dropping capabilities | `src/capability.rs` | ✅ Fixed — widened to `u32`, added `const` bounds check |
-| AUDIT-002 | **Critical** | HMAC attestation claimed in docs but `try_next()` returns `Ok(None)` without any verification | `src/stream.rs` | ✅ Fixed — explicit `SECURITY` doc block + `todo!()` semantics documented |
-| AUDIT-003 | **High** | TOCTOU: `Path::exists()` checked before socket open; endpoint can disappear between check and use | `src/host.rs` | ✅ Fixed — direct connect with `io::ErrorKind` mapping |
-| AUDIT-004 | **High** | Inconsistent Mutex poison handling (`unwrap_or(false)` vs `expect` vs `if let Ok`) | `src/host.rs` | ✅ Fixed — unified `expect("... mutex poisoned")` |
-| AUDIT-005 | **High** | Builder pattern breaks ergonomics: `app_id()` returns `Result`, forcing `?` in the middle of a chain | `src/manifest.rs` | ✅ Fixed — deferred validation to `build()`, infallible intermediates |
-| AUDIT-006 | **Medium** | `max_rate_hz(0)` accepted; meaningless and risks division-by-zero downstream | `src/manifest.rs` | ✅ Fixed — rejected as `Malformed` |
-| AUDIT-007 | **Medium** | `IntentStream` / `Subscription` `!Send + !Sync` is not documented | `src/stream.rs` | ✅ Fixed — rustdoc thread-safety section added |
-| AUDIT-008 | **Medium** | `IntentObservation` has `Serialize` but no `Deserialize` | `src/intent.rs` | ✅ Fixed — manual `Deserialize` impl added |
-| AUDIT-009 | **Low** | Version drift: README says `0.1.0`, `Cargo.toml` says `0.1.1` | `README.md` | ✅ Fixed |
-| AUDIT-010 | **Low** | Unused dev-dependencies (`tokio`, `proptest`) inflate supply chain | `Cargo.toml` | ✅ Fixed — removed |
+| AUDIT-001 | Critical | `CapabilitySet` u8 wrap | `capability.rs` | `u32` + `const` bounds |
+| AUDIT-002 | Critical | HMAC attestation claimed but unimplemented | `stream.rs` | `compile_error!` without `kernel-stub` |
+| AUDIT-003 | High | TOCTOU in endpoint discovery | `host.rs` | Unconditional `EndpointNotFound` |
+| AUDIT-004 | High | Inconsistent mutex poison | `host.rs` | `into_inner()` recovery, no `expect()` |
+| AUDIT-005 | High | Builder returns `Result` mid-chain | `manifest.rs` | Infallible intermediates |
+| AUDIT-006 | Medium | `max_rate_hz(0)` accepted | `manifest.rs` | Rejected as `Malformed` |
+| AUDIT-007 | Medium | `!Send+!Sync` undocumented | `stream.rs` | rustdoc section |
+| AUDIT-008 | Medium | Missing `Deserialize` | `intent.rs` | Manual impl added |
+| AUDIT-009 | Low | Version drift | `README.md` | Synchronized |
+| AUDIT-010 | Low | Unused dev-deps | `Cargo.toml` | Removed |
+| HARDCORE-001 | Critical | `map_endpoint_error` blocking hang | `host.rs` | Removed entirely |
+| HARDCORE-002 | Critical | `align_of` fails on 32-bit | `intent.rs` | `#[repr(C, align(8))]` + target-gate |
+| HARDCORE-003 | Critical | `f32` confidence non-determinism | `intent.rs` | Q0.16 fixed-point |
+| HARDCORE-004 | High | Generic `PhantomData` | `stream.rs` | `PhantomData<SubscriptionInner>` |
+| HARDCORE-005 | High | `as_raw()` leaks internals | `capability.rs` | `RawCapabilitySet` opaque wrapper |
+| HARDCORE-006 | High | Silent truncation | `manifest.rs` | `assert!()` + `panic!()` |
+| HARDCORE-007 | High | `uninstall()` ignores poison | `host.rs` | `into_inner()` recovery |
+| HARDCORE-008 | Medium | `WithdrawReason` string serde | `mesh.rs` | `serde_repr` |
+| HARDCORE-009 | Medium | Missing `siphasher` dep | `Cargo.toml` | Inline FNV-1a |
+| HARDCORE-010 | Low | `try_next()` docs mismatch | `stream.rs` | `compile_error!` |
+| ENG-001 | Critical | `unimplemented!()` in security path | `stream.rs` | `compile_error!` |
+| ENG-002 | High | `expect()` in sync primitives | `host.rs` | Poison recovery |
+| ENG-003 | High | `MeshClient` fake readiness | `mesh.rs` | `MeshClientStub` |
+| ENG-004 | Medium | No time model | `time.rs` | `MonotonicTimestamp` + WCET |
+| ENG-005 | Medium | No fixed-point spec | `intent.rs` | Q0.16 documented |
+| ENG-006 | Low | `forbid(unsafe_code)` too rigid | `lib.rs` | `deny` + audited module |
 
 ## Verification
 
-After applying this patch, run:
-
 ```sh
-cargo test --all-features
-cargo clippy --all-features -- -D warnings
+# Development build (with stub)
+cargo test --all-features --features kernel-stub
+cargo clippy --all-features --features kernel-stub -- -D warnings
 cargo fmt --check
-cargo build --no-default-features
-cargo build --target thumbv7em-none-eabihf --no-default-features
+
+# Production build (must fail without kernel)
+cargo build --no-default-features  # expected: compile_error in stream.rs
+
+# Embedded target
+cargo build --target thumbv7em-none-eabihf --no-default-features --features kernel-stub
 ```
 
-All commands should pass cleanly before this release is considered verified.
+All commands must pass (or fail as expected) before release.

@@ -1,78 +1,62 @@
-# Release Notes — axonos-sdk 0.1.1
+# Release Notes — axonos-sdk 0.3.0
 
-## Security & Correctness Patch
+## Production-Hardened BCI SDK
 
-This release addresses all Critical and High severity findings from the
-independent security audit (2026-05-07). Downstream medical-device and
-BCI integrators are strongly encouraged to upgrade before deploying to
-any pre-clinical or clinical environment.
+This release addresses all Critical and High severity findings from independent security audits (0.1.0–0.2.0), plus architectural feedback from embedded/BCI engineers.
 
 ### Critical
 
-- **CapabilitySet bitfield widened to `u32`** (`src/capability.rs`)
-  - Previously `u8`, which would silently wrap on `1 << 8` if a future
-    `Capability` variant with discriminant ≥ 8 were added. This is now
-    a compile-time breaking change (the `const` assertion fails), preventing
-    silent capability corruption and potential privilege escalation.
-  - Added compile-time guard: `assert!((max_discriminant as usize) < 32)`.
+- **`try_next()` → `compile_error!`** (`src/stream.rs`)
+  - Without `kernel-stub` feature, the build fails at compile time with a clear message.
+  - No runtime panic. No silent no-op. No false sense of security.
+  - `kernel-stub` is explicitly marked as **development-only** in Cargo.toml and docs.
 
-- **Explicit HMAC attestation stub marker** (`src/stream.rs`)
-  - `try_next()` now carries a detailed `SECURITY` comment explaining that
-    truncated HMAC-SHA256 verification is pending kernel ABI stabilization.
-  - Prevents false sense of security for auditors reviewing the crate.
+- **Fixed-point Q0.16 confidence** (`src/intent.rs`)
+  - `u16` where `65535 == 1.0`. Deterministic across x86_64 SSE, Cortex-M4F FPU, soft-float.
+  - `confidence_f32()` is **display-only**, documented as non-deterministic.
+
+- **Portable layout** (`src/intent.rs`)
+  - `#[repr(C, align(8))]` with target-gated size assertions.
+  - Compiles on `thumbv7em-none-eabihf` (verified).
 
 ### High
 
-- **Eliminated TOCTOU in endpoint discovery** (`src/host.rs`)
-  - Removed `Path::exists()` check before socket open. The transport now
-    attempts the connection directly and maps the resulting `io::ErrorKind`
-    to the appropriate `TransportFault`. This closes the race between check
-    and use on Unix domain sockets and Windows named pipes.
+- **Mutex poison recovery** (`src/host.rs`)
+  - All `Mutex::lock()` sites use `match` + `into_inner()` recovery.
+  - No `expect()`. No panic in sync primitives. Logs condition via `eprintln!` in debug.
 
-- **Unified Mutex poison handling** (`src/host.rs`)
-  - All `Mutex` lock sites now use `expect("... mutex poisoned")` with
-    consistent, descriptive messages. Previously `fixture_installed()`
-    silently returned `false` on poison, leading to non-deterministic test
-    failures.
+- **Explicit stub naming** (`src/mesh.rs`)
+  - `MeshClientStub` replaces `MeshClient`. No false impression of readiness.
+  - Comprehensive rustdoc warning: "This is not a real client."
 
-- **ManifestBuilder: infallible intermediate steps** (`src/manifest.rs`)
-  - `app_id()`, `name()`, `vendor()` now return `Self` instead of
-    `Result<Self>`. Validation is deferred to `build()`, enabling ergonomic
-    chained construction without interleaving `?` operators.
-  - Added `MAX_DISPLAY_STRING_LEN` constant (64 bytes) for name/vendor
-    limits, validated in `build()`.
+- **Opaque `RawCapabilitySet`** (`src/capability.rs`)
+  - Internal bit layout hidden. `has_reserved_bits()` for wire validation.
+  - `Display` + `audit_format()` for deterministic logging.
 
-- **`max_rate_hz(0)` rejected** (`src/manifest.rs`)
-  - A rate of `0 Hz` is now rejected as `Malformed`, preventing potential
-    division-by-zero in downstream rate-limiting logic.
+- **No silent truncation** (`src/manifest.rs`)
+  - `assert!()` + `panic!()` on overflow. Infallible builder intermediates.
 
 ### Medium
 
-- **Added `serde::Deserialize` for `IntentObservation`** (`src/intent.rs`)
-  - Enables symmetric JSON/CBOR wire format: the SDK can now both serialize
-    and deserialize its own observations.
+- **`MonotonicTimestamp`** (`src/time.rs`)
+  - New module with WCET documentation per operation.
+  - `checked_sub()` + defensive `elapsed_since()`.
+  - `#[repr(transparent)]` u64.
 
-- **Documented `!Send + !Sync` contract** (`src/stream.rs`)
-  - Added explicit rustdoc notes explaining that `IntentStream` and
-    `Subscription` are intentionally `!Send + !Sync` due to kernel IPC
-    thread-affinity requirements.
+- **`#[deny(unsafe_code)]` with audited module** (`src/lib.rs`)
+  - Global `deny`. Single `zerocopy_ext` module with `allow(unsafe_code)`.
+  - Empty placeholder with safety contract documentation.
 
-- **Removed unused dev-dependencies** (`Cargo.toml`)
-  - Dropped `tokio` and `proptest` (not used in any test or example).
-  - Reduces compile times and supply-chain attack surface.
+- **`serde_repr` on `WithdrawReason`** (`src/mesh.rs`)
+  - Numeric `u8` wire format per MMP spec.
 
-- **Fixed `bare_metal_no_std` example feature gate**
-  - `required-features` changed from `["std"]` to `[]`, allowing the example
-    to be built with `cargo build --example bare_metal_no_std` without
-    forcing `std`.
+### Low
 
-### Low / Quality
-
-- README version string synchronized with `Cargo.toml` (`0.1.1`).
-- Added integration test for `CapabilitySet` u32 width exhaustiveness.
-- Added integration test for infallible builder intermediate steps.
+- README badges with real hyperlinks.
+- Email `info@axonos.org`.
+- `bare_metal_no_std` requires `kernel-stub` (explicit opt-in).
+- Examples updated for `MonotonicTimestamp` API.
 
 ---
 
-**Full audit report:** See `SECURITY_FIXES.md` for the original finding
-identifiers and remediation mapping.
+**Full audit reports:** See `SECURITY_FIXES.md`.

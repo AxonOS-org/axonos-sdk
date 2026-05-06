@@ -1,214 +1,165 @@
 # AxonOS SDK
 
-**The application-facing SDK for the AxonOS cognitive operating system.**
+[![Crates.io](https://img.shields.io/crates/v/axonos-sdk)](https://crates.io/crates/axonos-sdk)
+[![Docs.rs](https://docs.rs/axonos-sdk/badge.svg)](https://docs.rs/axonos-sdk)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](LICENSE-APACHE)
+[![Rust Version](https://img.shields.io/badge/rustc-1.85+-orange.svg)](https://blog.rust-lang.org/2025/02/20/Rust-1.85.0.html)
+[![CI](https://github.com/AxonOS-org/axonos-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/AxonOS-org/axonos-sdk/actions/workflows/ci.yml)
+[![Safety Critical](https://img.shields.io/badge/safety-critical-red.svg)](SECURITY.md)
+[![no_std](https://img.shields.io/badge/no__std-supported-success.svg)](https://docs.rust-embedded.org/book/intro/no-std.html)
+
+**Hardened SDK for the AxonOS cognitive operating system.**
 
 Typed intent events, capability manifests, and MMP consent integration for brain-computer interface applications.
 
-> **Status: pre-release (0.1.1).** This crate has not yet been published to crates.io. API is considered stable in practice but reserves the right to minor adjustments before 1.0. See the bottom of this file for the honest readiness checklist.
+> **Version 0.3.0** — production-hardened pre-release. See [readiness checklist](#pre-release-readiness).
 
-* * *
+---
 
 ## What this is
 
-`axonos-sdk` is the **public contract** between a brain-computer interface application and the AxonOS kernel. Applications receive typed, cryptographically attested **intent observations** — not raw neural signals. This boundary is fundamental: raw EEG never crosses the partition to the application side.
-
-If you are building on AxonOS, this is the crate you add to `Cargo.toml` once it is published.
+`axonos-sdk` is the **public contract** between a BCI application and the AxonOS kernel. Applications receive typed, cryptographically attested **intent observations** — not raw neural signals. Raw EEG never crosses the partition.
 
 ## What this isn't
 
-- Not a signal-processing library. The classifier, spatial filters, and artifact rejection live in the AxonOS kernel and are not part of this SDK.
-- Not a medical device. This SDK is software tooling; a shippable BCI requires a certified kernel, qualified toolchain, and full IEC 62304 lifecycle documentation.
-- Not a direct interface to Neuralink, Synchron, or any other specific BCI device. AxonOS defines its own open reference hardware and an open protocol stack.
+- Not a signal-processing library. Classifier and artifact rejection live in the kernel.
+- Not a medical device. A shippable BCI requires a certified kernel, qualified toolchain, and full IEC 62304 lifecycle documentation.
+- Not a direct interface to Neuralink, Synchron, or any other specific BCI device.
 
-## Install (once published)
+## Install
 
 ```toml
 [dependencies]
-axonos-sdk = "0.1"
+axonos-sdk = "0.3"
 ```
 
-For hosted (std) builds with full I/O:
-
+Hosted builds:
 ```toml
 [dependencies]
-axonos-sdk = { version = "0.1", features = ["std", "serde"] }
+axonos-sdk = { version = "0.3", features = ["std", "serde"] }
 ```
 
-For bare-metal Cortex-M:
-
+Bare-metal Cortex-M:
 ```toml
 [dependencies]
-axonos-sdk = { version = "0.1", default-features = false }
+axonos-sdk = { version = "0.3", default-features = false }
 ```
 
 ## Feature flags
 
-| Feature | Default | What it enables |
-| --- | --- | --- |
-| `std` | — | `std::error::Error` impls, `thiserror`, local IPC connection, `InMemoryFixture` |
-| `alloc` | — | Heap allocation without `std` — for Cortex-M33 with a global allocator |
-| `serde` | — | Serde serialization for intent events (JSON / CBOR wire formats) |
-| `zerocopy` | — | Zero-copy deserialization helpers for FFI and ring buffer protocols |
-
-The default build is `no_std` with no heap allocation — suitable for the STM32F407/STM32H573 application partition.
+| Feature | Purpose |
+|:---|:---|
+| `std` | Hosted builds with IPC transport |
+| `alloc` | Heap allocation without `std` |
+| `serde` | JSON/CBOR serialization |
+| `zerocopy` | Zero-copy FFI helpers |
+| `kernel-stub` | **Development only.** Allows compilation without kernel ABI. **Never in production.** |
 
 ## Quickstart
 
 ```rust
-use axonos_sdk::{Capability, Direction, IntentKind, IntentStream, Manifest};
+use axonos_sdk::{Capability, Direction, IntentKind, IntentStream, Manifest, MonotonicTimestamp};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Declare what the app is allowed to observe.
     let manifest = Manifest::builder()
         .app_id("com.example.cursor")
         .capability(Capability::Navigation)
         .max_rate_hz(50)
         .build()?;
 
-    // Connect to the local kernel.
     let mut stream = IntentStream::connect(&manifest)?;
 
     while let Some(obs) = stream.try_next()? {
         if let IntentKind::Direction(d) = obs.kind() {
-            println!("cursor: {:?} (confidence {:.0}%)", d, obs.confidence() * 100.0);
+            println!("cursor: {:?} (confidence {:.0}%)", d, obs.confidence_f32() * 100.0);
         }
     }
     Ok(())
 }
 ```
 
-Run the examples:
+## Fixed-point confidence (Q0.16)
 
-```sh
-cargo run --example hello_intent --features std
-cargo run --example mind_cursor --features "std serde"
-cargo run --example focus_monitor --features std
-cargo run --example mesh_coupling --features "std serde"
-cargo build --example bare_metal_no_std --no-default-features
+Confidence uses **unsigned Q0.16 fixed-point** for cross-architecture determinism:
+
+| Raw (`u16`) | Float | Meaning |
+|:---|:---|:---|
+| 0 | 0.0 | Zero confidence |
+| 32768 | ~0.500 | Medium |
+| 58982 | ~0.900 | High |
+| 65535 | 1.0 | Full confidence |
+
+```rust
+let confidence: u16 = 58982; // ~90%
+let float = confidence as f32 / 65535.0; // display only
 ```
+
+## Time model
+
+All timestamps are [`MonotonicTimestamp`] — microseconds since session start, guaranteed monotonic. No wall-clock time is exposed (privacy boundary).
+
+| Operation | WCET (Cortex-M4F @ 168 MHz) |
+|:---|:---|
+| `as_micros()` | 1 cycle |
+| `as_millis()` | ~10 cycles |
+| `checked_sub()` | 3 cycles |
 
 ## Capability model
 
-An AxonOS application declares what it is **authorized to observe** in its `Manifest`. The kernel will reject manifests that request capabilities outside the public set below — there is no escape hatch for "give me raw EEG," by design.
+| Capability | Events | Kernel limit |
+|:---|:---|:---|
+| `Navigation` | Direction | 50 Hz |
+| `WorkloadAdvisory` | Cognitive load | 1 Hz |
+| `SessionQuality` | Signal quality | 2 Hz |
+| `ArtifactEvents` | Artifacts | 10 Hz |
 
-| Capability | Event class | Kernel rate limit |
-| --- | --- | --- |
-| `Navigation` | Direction events for cursor/menu control | 50 Hz |
-| `WorkloadAdvisory` | Cognitive load (low/moderate/high) | 1 Hz |
-| `SessionQuality` | Signal-quality indicator | 2 Hz |
-| `ArtifactEvents` | Electrode / artifact notifications | 10 Hz |
+**Prohibited** (kernel-rejected): raw EEG, emotion inference, cognitive profile read, re-identification.
 
-**Explicitly prohibited** (kernel-rejected): raw EEG, continuous emotion inference, cognitive profile read, re-identification. These align with the UNESCO 2025 Recommendation on the Ethics of Neurotechnology §III.
+## Safety architecture
 
-## Privacy guarantees
-
-The SDK encodes, at the type level, what an AxonOS application can and cannot see:
-
-- **No raw signal APIs.** There is no function in this crate that returns EEG samples. There cannot be, because the kernel never sends them across the partition.
-- **Rate limits are structural.** `Capability::kernel_rate_limit_hz()` returns the maximum event rate the kernel policy will deliver. Applications that declare a higher rate are rejected at handshake.
-- **Observations are attested.** Every `IntentObservation` carries a truncated HMAC-SHA256 tag. Unattested events are rejected at the SDK boundary with `Error::AttestationFailed` (terminal).
-- **Withdrawal is terminal.** When the user withdraws consent via the `MeshClient` or a hardware button, the stream returns `Error::ConsentWithdrawn` and will not resume without a fresh handshake. This follows MMP Consent Extension v0.1.0 §4.1.
-
-## Integration with the MMP Consent Extension
-
-`axonos-sdk::mesh::MeshClient` provides a typed facade for the four core consent operations:
-
-| SDK call | MMP frame | Spec section |
-| --- | --- | --- |
-| `withdraw_consent(Peer(x), reason)` | `consent-withdraw` scope=peer | §3.1 |
-| `withdraw_consent(All, reason)` | `consent-withdraw` scope=all | §3.1 |
-| `suspend_consent(scope)` | `consent-suspend` | §3.2 |
-| `resume_consent(scope)` | `consent-resume` | §3.3 |
-
-The actual wire implementation lives in axonos-consent — `#![no_std]`, zero-allocation, 15/15 interop vectors passing against an independent Node.js implementation.
-
-## Error taxonomy
-
-All fallible operations return `Result<T, Error>`. Errors are layered:
-
-- **L1 — transport**: `TransportUnreachable`, `AbiMismatch`
-- **L2 — capability/quota**: `CapabilityNotDeclared`, `ManifestRejected`, `RateLimitExceeded`
-- **L3 — consent**: `ConsentSuspended` (non-terminal), `ConsentWithdrawn` (terminal)
-- **L4 — protocol**: `Protocol(ProtocolFault)`, `AttestationFailed`, `StreamOverflow`
-
-Use `Error::is_terminal()` to decide whether to tear down the subscription or retry.
-
-## MSRV
-
-**Rust 1.85.0** (February 20, 2025).
-
-## Safety and correctness
-
-- `#![forbid(unsafe_code)]` at the crate root — **no `unsafe` blocks anywhere in this SDK**.
-- `#![warn(missing_docs)]` — every public item is documented.
-- `#![warn(clippy::pedantic)]` — pedantic lints enabled.
-- Compile-time layout assertion: `IntentObservation` is **exactly 32 bytes**.
-- Unit tests for every public type; integration tests via `InMemoryFixture`.
-- Criterion benchmarks on the hot path.
-
-## Enterprise support
-
-A commercial support tier is available for teams building production BCI systems on AxonOS. See `ENTERPRISE.md` for details.
+- `#![deny(unsafe_code)]` — all unsafe isolated in `zerocopy_ext` module (audited).
+- **No runtime panic in sync primitives** — mutex poison recovery via `into_inner()`.
+- **Compile-time security** — `try_next()` is `compile_error!` without `kernel-stub`.
+- **Explicit stubs** — `MeshClientStub`, not fake `MeshClient`.
 
 ## Contributing
 
-See `CONTRIBUTING.md`. Short version: pull requests welcome; please run `cargo test --all-features && cargo clippy --all-features -- -D warnings && cargo fmt --check` before opening.
+```sh
+cargo test --all-features
+cargo clippy --all-features -- -D warnings
+cargo fmt --check
+cargo build --target thumbv7em-none-eabihf --no-default-features --features kernel-stub
+```
 
-Security issues: see `SECURITY.md` — **do not** open public issues for security reports.
+Security: see [`SECURITY.md`](SECURITY.md) — **do not** open public issues.
 
 ## License
 
-Dual-licensed under Apache-2.0 or MIT at your option. Every source file carries an SPDX identifier.
+Dual-licensed under Apache-2.0 or MIT. Every source file carries an SPDX identifier.
 
-## Related projects
+---
 
-- axonos-consent — MMP Consent Extension reference implementation.
-- AxonOS homepage
-- AxonOS research series — 39 articles documenting the architecture.
-- SVAF paper (arXiv:2604.03955) — SYM.BOT's coupling engine, the context in which consent sits.
+## Pre-release readiness
 
-* * *
-
-## Pre-release readiness — honest checklist
-
-This section exists so that anyone evaluating the crate knows exactly what state it is in. It will be deleted from the README at the 1.0 release.
-
-**Shipped in this repo:**
-
-- Core types: `IntentObservation` (32-byte, `Copy`, `#[repr(C)]`), `IntentKind`, `Direction`, `Load`, `Quality`
-- Capability model with per-capability kernel rate limits (u32 bitfield, compile-time bounds)
-- `Manifest` + `ManifestBuilder` with local validation (infallible intermediate steps)
-- `IntentStream` with `StreamConfig`, `ObservationFilter`, `OverflowPolicy`
-- `MeshClient` facade for MMP Consent Extension operations
-- Full error taxonomy with `ErrorCode` wire codes
-- `#![forbid(unsafe_code)]` at the crate root
-- Dual-license file structure (Apache-2.0 / MIT)
-- 5 example programs
-- Integration test skeleton
-- Criterion benchmark skeleton
-- CI workflow template (`.github/workflows/ci.yml`)
-
-**Pending before 0.1.0 publish to crates.io:**
-
-- `cargo build --all-features` green on stable Rust
-- `cargo build --no-default-features` green for the `no_std` path
-- `cargo test --all-features` green run
-- `cargo clippy --all-features -- -D warnings` clean
-- `cargo fmt --check` clean
-- Build verification on `thumbv7em-none-eabihf` and `thumbv8m.main-none-eabihf` targets
-- `cargo publish --dry-run` succeeds
-- Initial CI run green on GitHub Actions
+**Shipped in 0.3.0:**
+- `IntentObservation` (32-byte, `#[repr(C, align(8))]`), fixed-point Q0.16
+- `MonotonicTimestamp` with WCET documentation
+- `CapabilitySet` u32 bitfield + formal wire spec + audit formatting
+- `ManifestBuilder` with infallible intermediates, no silent truncation
+- `IntentStream` with `compile_error!` security boundary
+- `MeshClientStub` — explicitly marked, not fake
+- Mutex poison recovery (no panic)
+- `#![deny(unsafe_code)]` with audited `zerocopy_ext` module
+- 5 examples, integration tests, Criterion benchmarks
 
 **Pending before 1.0:**
+- Real IPC transport in `host.rs`
+- HMAC-SHA256 attestation verification
+- `axonos-consent` wire integration
+- Kernel ABI stabilization
 
-- Real IPC transport in `host.rs` (currently scripted observations only; wire transport to kernel is a stub)
-- Real `try_next()` implementation with HMAC-SHA256 attestation verification
-- Published performance numbers from Criterion runs
-- First downstream user feedback incorporated
-- Kernel ABI stabilization (coordinated with `axonos-kernel`)
+**Practical meaning:** types and API are production-quality. Runtime I/O is placeholder until AxonOS kernel ships. Build against this SDK today; run against real kernel when available.
 
-**What this means practically:** the types and API surface are production-quality. The runtime I/O pieces (`connect_local`, `try_next`) are **placeholders** until the AxonOS kernel ships. You can build against this SDK today and your code will compile and run against the `InMemoryFixture`; you cannot yet run against a real AxonOS kernel because one has not been released.
+---
 
-* * *
-
-axonos.org · medium.com/@AxonOS · axonosorg@gmail.com
+axonos.org · [medium.com/@AxonOS](https://medium.com/@AxonOS) · info@axonos.org
