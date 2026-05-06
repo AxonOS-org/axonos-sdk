@@ -3,8 +3,8 @@
 
 //! Error taxonomy for the AxonOS SDK.
 //!
-//! All fallible operations return [`Result<T>`], which is an alias for
-//! `core::result::Result<T, Error>`. The error enum is exhaustive — adding
+//! All fallible operations return [`Result`], which is an alias for
+//! `core::result::Result`. The error enum is exhaustive — adding
 //! a new variant is a breaking change and will require a major version bump.
 //!
 //! The taxonomy is layered:
@@ -23,7 +23,7 @@
 use core::fmt;
 
 /// Result type alias used throughout the SDK.
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// Top-level error enum for all SDK operations.
 ///

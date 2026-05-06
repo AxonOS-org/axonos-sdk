@@ -57,24 +57,20 @@ pub fn connect_local(manifest: &Manifest, config: StreamConfig) -> Result<Intent
     // Endpoint discovery.
     let endpoint = resolve_endpoint();
 
+    // SECURITY FIX: Eliminated TOCTOU race. We no longer check Path::exists()
+    // before opening; instead we attempt the connection and map the resulting
+    // I/O error directly to the appropriate TransportFault.
+    //
     // The full implementation would:
-    //   1. Open a Unix socket at `endpoint`
-    //   2. Send the serialized manifest
-    //   3. Receive the kernel's ManifestAck
-    //   4. Construct an IntentStream bound to the returned subscription id
+    // 1. Open a Unix socket at `endpoint`
+    // 2. Send the serialized manifest
+    // 3. Receive the kernel's ManifestAck
+    // 4. Construct an IntentStream bound to the returned subscription id
     //
     // In this SDK release, the endpoint is expected to be absent unless
-    // a fixture has been installed via `install_fixture`. This returns
-    // a transport error with a specific fault type so applications can
-    // distinguish "no kernel" from "permission denied".
+    // a fixture has been installed via `install_fixture`.
     if !fixture_installed() {
-        return Err(Error::TransportUnreachable(
-            if std::path::Path::new(&endpoint).exists() {
-                TransportFault::ConnectionRefused
-            } else {
-                TransportFault::EndpointNotFound
-            },
-        ));
+        return Err(map_endpoint_error(&endpoint));
     }
 
     let mut stream = IntentStream::new(manifest, config);
@@ -84,6 +80,49 @@ pub fn connect_local(manifest: &Manifest, config: StreamConfig) -> Result<Intent
     };
     stream.attach_subscription(sub);
     Ok(stream)
+}
+
+/// Map an endpoint path to the appropriate transport error without TOCTOU.
+fn map_endpoint_error(endpoint: &str) -> Error {
+    use std::io;
+
+    // Attempt a non-blocking connect to classify the failure reason.
+    #[cfg(unix)]
+    {
+        match std::os::unix::net::UnixStream::connect(endpoint) {
+            Ok(_) => Error::TransportUnreachable(TransportFault::ConnectionRefused),
+            Err(e) => match e.kind() {
+                io::ErrorKind::NotFound => {
+                    Error::TransportUnreachable(TransportFault::EndpointNotFound)
+                }
+                io::ErrorKind::PermissionDenied => {
+                    Error::TransportUnreachable(TransportFault::PermissionDenied)
+                }
+                _ => Error::TransportUnreachable(TransportFault::ConnectionRefused),
+            },
+        }
+    }
+    #[cfg(windows)]
+    {
+        // Windows named pipes: try to open the pipe to determine fault.
+        match std::fs::OpenOptions::new().write(true).open(endpoint) {
+            Ok(_) => Error::TransportUnreachable(TransportFault::ConnectionRefused),
+            Err(e) => match e.kind() {
+                io::ErrorKind::NotFound => {
+                    Error::TransportUnreachable(TransportFault::EndpointNotFound)
+                }
+                io::ErrorKind::PermissionDenied => {
+                    Error::TransportUnreachable(TransportFault::PermissionDenied)
+                }
+                _ => Error::TransportUnreachable(TransportFault::ConnectionRefused),
+            },
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = endpoint;
+        Error::TransportUnreachable(TransportFault::EndpointNotFound)
+    }
 }
 
 /// Resolve the IPC endpoint path, honouring `AXONOS_ENDPOINT` if set.
@@ -109,12 +148,12 @@ static NEXT_SUB_ID: Mutex<u64> = Mutex::new(1);
 fn fixture_installed() -> bool {
     FIXTURE
         .lock()
-        .map(|g| g.is_some())
-        .unwrap_or(false)
+        .expect("fixture mutex poisoned")
+        .is_some()
 }
 
 fn next_subscription_id() -> u64 {
-    let mut g = NEXT_SUB_ID.lock().expect("lock poisoned");
+    let mut g = NEXT_SUB_ID.lock().expect("subscription id mutex poisoned");
     let n = *g;
     *g += 1;
     n
@@ -157,7 +196,7 @@ impl InMemoryFixture {
     /// Install this fixture as the active one. Subsequent calls to
     /// [`connect_local`] will succeed against it.
     pub fn install(self) {
-        let mut g = FIXTURE.lock().expect("lock poisoned");
+        let mut g = FIXTURE.lock().expect("fixture mutex poisoned");
         *g = Some(self);
     }
 
@@ -183,7 +222,6 @@ mod tests {
     fn test_manifest() -> Manifest {
         Manifest::builder()
             .app_id("com.test.host")
-            .unwrap()
             .capability(Capability::Navigation)
             .max_rate_hz(10)
             .build()

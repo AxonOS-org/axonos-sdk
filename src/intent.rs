@@ -39,7 +39,7 @@ use core::fmt;
 /// # Layout
 ///
 /// | Offset | Size | Field |
-/// |:---|:---:|:---|
+/// |:---|:---|:---|
 /// | 0 | 8 | `timestamp_us` — microseconds since session start |
 /// | 8 | 2 | `kind_tag` — discriminant for [`IntentKind`] |
 /// | 10 | 2 | `quality` — classifier confidence (u16 / 65535.0) |
@@ -53,11 +53,11 @@ use core::fmt;
 /// use axonos_sdk::{IntentObservation, IntentKind, Direction};
 ///
 /// let obs = IntentObservation::new_direction(
-///     12_345,                        // timestamp_us
+///     12_345, // timestamp_us
 ///     Direction::Up,
-///     0.84,                          // confidence
-///     0xDEAD_BEEF_u64,               // session_id
-///     [0u8; 8],                      // attestation (in real code from kernel)
+///     0.84, // confidence
+///     0xDEAD_BEEF_u64, // session_id
+///     [0u8; 8], // attestation (in real code from kernel)
 /// );
 ///
 /// assert_eq!(obs.kind(), IntentKind::Direction(Direction::Up));
@@ -221,7 +221,10 @@ impl fmt::Debug for IntentObservation {
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for IntentObservation {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         use serde::ser::SerializeStruct;
         let mut st = s.serialize_struct("IntentObservation", 5)?;
         st.serialize_field("timestamp_us", &self.timestamp_us)?;
@@ -230,6 +233,73 @@ impl serde::Serialize for IntentObservation {
         st.serialize_field("session_id", &self.session_id)?;
         st.serialize_field("attestation", &self.attestation)?;
         st.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for IntentObservation {
+    fn deserialize<D>(d: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use core::fmt;
+
+        struct ObsVisitor;
+
+        impl<'de> Visitor<'de> for ObsVisitor {
+            type Value = IntentObservation;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("struct IntentObservation")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<IntentObservation, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut timestamp_us = None;
+                let mut kind = None::<IntentKind>;
+                let mut confidence = None::<f32>;
+                let mut session_id = None;
+                let mut attestation = None::<[u8; 8]>;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "timestamp_us" => timestamp_us = Some(map.next_value()?),
+                        "kind" => kind = Some(map.next_value()?),
+                        "confidence" => confidence = Some(map.next_value()?),
+                        "session_id" => session_id = Some(map.next_value()?),
+                        "attestation" => attestation = Some(map.next_value()?),
+                        _ => { let _ = map.next_value::<de::IgnoredAny>()?; }
+                    }
+                }
+
+                let timestamp_us = timestamp_us.ok_or_else(|| de::Error::missing_field("timestamp_us"))?;
+                let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
+                let confidence = confidence.unwrap_or(1.0);
+                let session_id = session_id.ok_or_else(|| de::Error::missing_field("session_id"))?;
+                let attestation = attestation.ok_or_else(|| de::Error::missing_field("attestation"))?;
+
+                let obs = match kind {
+                    IntentKind::Direction(d) => {
+                        IntentObservation::new_direction(timestamp_us, d, confidence, session_id, attestation)
+                    }
+                    IntentKind::Load(l) => {
+                        IntentObservation::new_load(timestamp_us, l, confidence, session_id, attestation)
+                    }
+                    IntentKind::Quality(q) => {
+                        IntentObservation::new_quality(timestamp_us, q, session_id, attestation)
+                    }
+                    IntentKind::Unknown => {
+                        return Err(de::Error::custom("cannot deserialize Unknown intent kind into concrete observation"));
+                    }
+                };
+                Ok(obs)
+            }
+        }
+
+        d.deserialize_struct("IntentObservation", &["timestamp_us", "kind", "confidence", "session_id", "attestation"], ObsVisitor)
     }
 }
 
@@ -286,7 +356,7 @@ impl KindTag {
 /// Classified intent kind. Variants are discriminated at the wire level
 /// by [`IntentObservation::kind_tag`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "snake_case"))]
 pub enum IntentKind {
     /// A navigation direction intent.
@@ -306,7 +376,7 @@ pub enum IntentKind {
 /// reading (Up=0, Right=1, Down=2, Left=3), which simplifies integration
 /// with 2D cursor control loops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Direction {
@@ -337,7 +407,7 @@ impl Direction {
 
 /// Cognitive workload class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Load {
@@ -363,7 +433,7 @@ impl Load {
 /// Signal quality class — reported periodically so applications can gracefully
 /// degrade when electrode contact is poor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Quality {

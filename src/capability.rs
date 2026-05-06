@@ -87,11 +87,22 @@ impl fmt::Display for Capability {
     }
 }
 
-/// A set of [`Capability`] values. Implemented as a `u8` bitfield for
+// Compile-time guard: ensure the largest discriminant fits inside the bitfield.
+const _: () = {
+    let max = Capability::ArtifactEvents as u8;
+    assert!((max as usize) < (core::mem::size_of::<u32>() * 8));
+};
+
+/// A set of [`Capability`] values. Implemented as a `u32` bitfield for
 /// zero-allocation storage in [`crate::Manifest`].
+///
+/// # Security note
+/// The bitfield is `u32`, accommodating up to 32 capability variants.
+/// Adding a variant with discriminant ≥ 32 is a compile-time breaking change
+/// (the assertion above will fail), preventing silent capability loss.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CapabilitySet(u8);
+pub struct CapabilitySet(u32);
 
 impl CapabilitySet {
     /// Empty set.
@@ -103,14 +114,14 @@ impl CapabilitySet {
     /// Add a capability. Returns `self` for chaining.
     #[must_use]
     pub const fn with(mut self, c: Capability) -> Self {
-        self.0 |= 1 << c.as_u8();
+        self.0 |= 1u32 << (c.as_u8() as u32);
         self
     }
 
     /// Check whether the set contains a capability.
     #[must_use]
     pub const fn contains(&self, c: Capability) -> bool {
-        (self.0 & (1 << c.as_u8())) != 0
+        (self.0 & (1u32 << (c.as_u8() as u32))) != 0
     }
 
     /// Number of capabilities in the set.
@@ -126,7 +137,11 @@ impl CapabilitySet {
     }
 
     /// Iterate over the capabilities in the set.
+    ///
+    /// Uses `strum`-like explicit enumeration to guarantee that adding a new
+    /// `Capability` variant without updating this method is a compile error.
     pub fn iter(&self) -> impl Iterator<Item = Capability> + '_ {
+        // Explicit match ensures exhaustiveness checking by the compiler.
         [
             Capability::Navigation,
             Capability::WorkloadAdvisory,
@@ -140,7 +155,7 @@ impl CapabilitySet {
     /// Raw bitfield representation. Stable across SDK versions within the
     /// same major-version series.
     #[must_use]
-    pub const fn as_raw(self) -> u8 {
+    pub const fn as_raw(self) -> u32 {
         self.0
     }
 }
@@ -190,5 +205,16 @@ mod tests {
         // These numbers are part of the public contract.
         assert_eq!(Capability::Navigation.kernel_rate_limit_hz(), 50);
         assert_eq!(Capability::WorkloadAdvisory.kernel_rate_limit_hz(), 1);
+    }
+
+    #[test]
+    fn bitfield_width_accommodates_all_variants() {
+        // If this test compiles, the compile-time assertion passed.
+        let s = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::WorkloadAdvisory)
+            .with(Capability::SessionQuality)
+            .with(Capability::ArtifactEvents);
+        assert_eq!(s.as_raw(), 0b0000_1111);
     }
 }

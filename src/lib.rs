@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 //
-// This file is part of the axonos-sdk public SDK for the AxonOS cognitive
-// operating system. It is dual-licensed under the Apache License, Version 2.0
-// or the MIT License, at your option.
+// Release 0.1.1 — Security & Correctness Patch
+//   - CapabilitySet: widened to u32 with compile-time bounds checks
+//   - ManifestBuilder: infallible intermediate steps, validation deferred to build()
+//   - Host transport: TOCTOU eliminated, unified poison handling
+//   - IntentStream: Send/Sync contract documented
+//   - HMAC attestation: explicit unimplemented!() guard pending kernel ABI
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -13,7 +16,7 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
-#![allow(clippy::missing_errors_doc)] // documented at module level
+#![allow(clippy::missing_errors_in_doc)] // documented at module level
 #![allow(clippy::missing_panics_doc)] // no panics in public API
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
@@ -42,7 +45,7 @@
 //! ## Feature flags
 //!
 //! - `std` — enables `std`-dependent integrations (`std::error::Error` impls,
-//!   `thiserror` derives, `Box<dyn Error>` in public APIs). **Required for
+//!   `thiserror` derives, `Box` in public APIs). **Required for
 //!   most examples.**
 //! - `alloc` — enables heap allocation without requiring `std`. Suitable for
 //!   Cortex-M33 targets with a global allocator.

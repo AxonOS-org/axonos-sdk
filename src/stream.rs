@@ -8,6 +8,14 @@
 //! same type works over a local IPC endpoint, a test fixture, or a shared
 //! memory ring buffer.
 //!
+//! # Thread safety
+//!
+//! `IntentStream` is intentionally **neither `Send` nor `Sync`** when built
+//! via the `std` host module, because it may hold a kernel-bound IPC handle
+//! with thread-affinity requirements. If you need to move the stream across
+//! threads, wrap it in a channel or re-create the subscription on the target
+//! thread.
+//!
 //! # Filters
 //!
 //! Applications can optionally install an [`ObservationFilter`] to reduce
@@ -32,6 +40,11 @@ use crate::manifest::Manifest;
 pub const DEFAULT_BUFFER_CAPACITY: usize = 256;
 
 /// Subscription handle. Dropping this ends the subscription.
+///
+/// # Thread safety
+/// `Subscription` contains a `PhantomData<*const ()>` and is therefore
+/// `!Send + !Sync` by default. This reflects that the underlying kernel
+/// subscription may be bound to a specific thread or interrupt context.
 #[derive(Debug)]
 pub struct Subscription {
     pub(crate) id: SubscriptionId,
@@ -175,6 +188,11 @@ impl Default for StreamConfig {
 /// `std` feature is enabled. For no_std builds, applications integrate
 /// directly with the kernel ring buffer — see the `bare_metal_no_std`
 /// example.
+///
+/// # Thread safety
+/// `IntentStream` is `!Send + !Sync` because it may hold kernel-bound IPC
+/// state with thread-affinity requirements. Do not move across threads
+/// without re-creating the subscription.
 #[derive(Debug)]
 #[must_use]
 pub struct IntentStream {
@@ -237,15 +255,25 @@ impl IntentStream {
 
     /// Try to get the next observation. Non-blocking.
     ///
+    /// # Security
+    /// **HMAC attestation is not yet implemented.** This method currently
+    /// returns `Ok(None)` as a placeholder. When the kernel transport is
+    /// wired up, every observation will be verified against the session key
+    /// and [`crate::Error::AttestationFailed`] will be returned for forged
+    /// or tampered events.
+    ///
     /// # Errors
     ///
     /// Returns the same error set as [`crate::Error`]. In particular,
     /// [`Error::ConsentSuspended`] is non-terminal — the caller should
     /// retry after a consent-resume event.
     pub fn try_next(&mut self) -> Result<Option<IntentObservation>> {
-        // The host module implements the real I/O. Here we return None
-        // to indicate "no observation available" — a fully working
-        // implementation is provided in the feature-gated host module.
+        // SECURITY: HMAC-SHA256 truncated attestation verification is
+        // pending kernel ABI stabilization. See SECURITY.md §Threat model.
+        // When implemented, this path will:
+        //   1. Read the next raw frame from the transport.
+        //   2. Verify the 8-byte truncated HMAC against the session key.
+        //   3. Return AttestationFailed if the tag does not match.
         Ok(None)
     }
 
@@ -260,6 +288,9 @@ impl IntentStream {
 /// Hash the app_id for internal bookkeeping (stable, non-cryptographic).
 fn hash_app_id(id: &str) -> u64 {
     use core::hash::Hasher;
+    // SipHasher-1-3 with default keys gives us a stable, deterministic hash
+    // across Rust compiler versions for the same input. This is acceptable
+    // for internal correlation IDs; it is NOT a cryptographic hash.
     let mut h = siphasher::sip::SipHasher::new();
     h.write(id.as_bytes());
     h.finish()
@@ -274,7 +305,6 @@ mod tests {
     fn test_manifest() -> Manifest {
         Manifest::builder()
             .app_id("com.test.a")
-            .unwrap()
             .capability(Capability::Navigation)
             .max_rate_hz(10)
             .build()
