@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-//! Focus monitor: aggregate cognitive load events into a 1-minute
-//! privacy-preserving average.
-//!
-//! This example demonstrates the `WorkloadAdvisory` capability — a
-//! deliberately low-bandwidth channel (≤1 Hz) that avoids sending
-//! continuous mental-state data.
-//!
-//! Run with:
+//! Focus monitor: aggregate cognitive load into privacy-preserving average.
 //!
 //! ```sh
-//! cargo run --example focus_monitor --features std
+//! cargo run --example focus_monitor --features "std kernel-stub"
 //! ```
 
 use axonos_sdk::{
     host::InMemoryFixture, Capability, IntentKind, IntentObservation, IntentStream, Load, Manifest,
+    MonotonicTimestamp,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,20 +16,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .name("Focus Monitor")
         .capability(Capability::WorkloadAdvisory)
         .capability(Capability::SessionQuality)
-        .max_rate_hz(1) // respect the 1 Hz kernel limit for WorkloadAdvisory
+        .max_rate_hz(1)
         .build()?;
 
-    // Fixture: 5 workload samples at 1 Hz.
     let mut fx = InMemoryFixture::new();
+    let ts = MonotonicTimestamp::from_micros_unchecked;
     for (i, load) in [Load::Low, Load::Moderate, Load::Moderate, Load::High, Load::Moderate]
         .iter()
         .enumerate()
     {
         #[allow(clippy::cast_possible_truncation)]
         fx.push(IntentObservation::new_load(
-            (i as u64) * 1_000_000,
+            ts((i as u64) * 1_000_000),
             *load,
-            0.80,
+            52428, // ~0.80 Q0.16
             7,
             [0; 8],
         ));
@@ -43,7 +37,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fx.install();
 
     let mut stream = IntentStream::connect(&manifest)?;
-
     let mut score_sum: i32 = 0;
     let mut samples: i32 = 0;
 
@@ -58,11 +51,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 score_sum += score;
                 samples += 1;
                 println!(
-                    "[t={:>4}s] load={:?} (score={}) conf={:.0}%",
+                    "[t={:>4}s] load={:?} (score={}) conf_raw={}",
                     obs.timestamp_us() / 1_000_000,
                     load,
                     score,
-                    obs.confidence() * 100.0,
+                    obs.confidence_raw(),
                 );
             }
         }
@@ -70,8 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if samples > 0 {
         let avg = f64::from(score_sum) / f64::from(samples);
-        println!();
-        println!("Average load over {} samples: {:.2} (1=low, 3=high)", samples, avg);
+        println!("\nAverage load: {:.2} (1=low, 3=high)", avg);
     }
 
     Ok(())
