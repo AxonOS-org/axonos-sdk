@@ -1,136 +1,113 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 
-//! Intent observation types — the application-facing data model.
+//! Intent observation types — application-facing data model.
 //!
-//! # What applications see
+//! # Fixed-point confidence (Q0.16)
 //!
-//! Applications do **not** receive raw neural signals. Instead, they receive
-//! typed [`IntentObservation`] events that have already been classified,
-//! validated, and cryptographically attested by the AxonOS signal processing
-//! pipeline. This boundary is fundamental to the privacy and safety model:
+//! Confidence is represented as **unsigned Q0.16 fixed-point**:
+//! ```text
+//! value_f32 = confidence_raw / 65535.0
+//! ```
 //!
-//! - **Privacy**: raw EEG never leaves the Secure World partition. An
-//!   attacker who fully compromises an AxonOS application cannot extract
-//!   the user's raw neural signals, because those signals are not on the
-//!   application side of the partition.
-//! - **Safety**: the classifier output is the smallest signal that is useful
-//!   to the application. The application cannot reconstruct finer-grained
-//!   mental state from an intent observation.
+//! | Raw (`u16`) | Float equivalent | Meaning |
+//! |:---|:---|:---|
+//! | 0 | 0.0 | Zero confidence |
+//! | 32768 | ~0.500 | Medium confidence |
+//! | 58982 | ~0.900 | High confidence |
+//! | 65535 | 1.0 | Full confidence |
 //!
-//! # Event layout
+//! This format is deterministic across all architectures — x86_64 SSE,
+//! Cortex-M4F FPU, and soft-float targets produce identical raw values.
 //!
-//! [`IntentObservation`] is **32 bytes**, `Copy`, `#[repr(C)]`, and suitable
-//! for zero-copy transport over FFI, shared memory, or a ring buffer. Every
-//! field has explicit bit-width and byte offset — this is a stable wire
-//! format.
+//! # Portable layout
+//!
+//! `IntentObservation` is `#[repr(C, align(8))]` — 32 bytes on both
+//! 64-bit hosts and 32-bit embedded targets.
 
-// All u8 casts in this module are from #[repr(u8)] enums and are safe.
 #![allow(clippy::cast_possible_truncation)]
 
+use crate::time::MonotonicTimestamp;
 use core::fmt;
 
-/// A single intent observation delivered from the AxonOS kernel to the
-/// application.
+/// A single intent observation. Always 32 bytes, always `Copy`.
 ///
-/// Always 32 bytes. Always `Copy`. Layout is stable across kernel versions
-/// with the same [`crate::KERNEL_ABI_VERSION`].
-///
-/// # Layout
+/// # Layout (stable across `KERNEL_ABI_VERSION == 1`)
 ///
 /// | Offset | Size | Field |
 /// |:---|:---|:---|
-/// | 0 | 8 | `timestamp_us` — microseconds since session start |
-/// | 8 | 2 | `kind_tag` — discriminant for [`IntentKind`] |
-/// | 10 | 2 | `quality` — classifier confidence (u16 / 65535.0) |
-/// | 12 | 4 | `payload` — kind-specific payload (see `IntentKind`) |
-/// | 16 | 8 | `session_id` — opaque session identifier |
-/// | 24 | 8 | `attestation` — truncated HMAC-SHA256 tag (first 8 bytes) |
-///
-/// # Example
-///
-/// ```
-/// use axonos_sdk::{IntentObservation, IntentKind, Direction};
-///
-/// let obs = IntentObservation::new_direction(
-///     12_345, // timestamp_us
-///     Direction::Up,
-///     0.84, // confidence
-///     0xDEAD_BEEF_u64, // session_id
-///     [0u8; 8], // attestation (in real code from kernel)
-/// );
-///
-/// assert_eq!(obs.kind(), IntentKind::Direction(Direction::Up));
-/// assert!((obs.confidence() - 0.84).abs() < 0.01);
-/// ```
+/// | 0 | 8 | `timestamp_us` — [`MonotonicTimestamp`] |
+/// | 8 | 2 | `kind_tag` |
+/// | 10 | 2 | `quality_raw` — Q0.16 confidence |
+/// | 12 | 4 | `payload` |
+/// | 16 | 8 | `session_id` |
+/// | 24 | 8 | `attestation` — truncated HMAC-SHA256 |
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct IntentObservation {
-    /// Monotonic microseconds since session start.
     pub(crate) timestamp_us: u64,
-    /// Discriminant. See [`IntentKind`].
     pub(crate) kind_tag: u16,
-    /// Quality / confidence score. `u16::MAX` == 1.0.
     pub(crate) quality_raw: u16,
-    /// Payload — interpretation depends on `kind_tag`.
     pub(crate) payload: [u8; 4],
-    /// Opaque session identifier.
     pub(crate) session_id: u64,
-    /// Truncated HMAC tag (first 8 bytes of HMAC-SHA256).
     pub(crate) attestation: [u8; 8],
 }
 
-// Compile-time layout assertion.
+// Compile-time layout assertions — target-gated for portability.
+#[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<IntentObservation>() == 32);
 const _: () = assert!(core::mem::align_of::<IntentObservation>() == 8);
 
 impl IntentObservation {
     /// Construct a Direction observation.
+    ///
+    /// `confidence` is Q0.16 fixed-point: `65535 == 1.0`.
+    /// Use [`crate::CONFIDENCE_DENOM`] for conversions.
     #[must_use]
     pub fn new_direction(
-        timestamp_us: u64,
+        timestamp: MonotonicTimestamp,
         dir: Direction,
-        confidence: f32,
+        confidence: u16,
         session_id: u64,
         attestation: [u8; 8],
     ) -> Self {
         let mut payload = [0u8; 4];
         payload[0] = dir as u8;
         Self {
-            timestamp_us,
+            timestamp_us: timestamp.as_micros(),
             kind_tag: KindTag::DIRECTION,
-            quality_raw: confidence_to_raw(confidence),
+            quality_raw: confidence,
             payload,
             session_id,
             attestation,
         }
     }
 
-    /// Construct a Load observation (cognitive workload).
+    /// Construct a Load observation.
     #[must_use]
     pub fn new_load(
-        timestamp_us: u64,
+        timestamp: MonotonicTimestamp,
         load: Load,
-        confidence: f32,
+        confidence: u16,
         session_id: u64,
         attestation: [u8; 8],
     ) -> Self {
         let mut payload = [0u8; 4];
         payload[0] = load as u8;
         Self {
-            timestamp_us,
+            timestamp_us: timestamp.as_micros(),
             kind_tag: KindTag::LOAD,
-            quality_raw: confidence_to_raw(confidence),
+            quality_raw: confidence,
             payload,
             session_id,
             attestation,
         }
     }
 
-    /// Construct a Quality observation (signal quality assessment).
+    /// Construct a Quality observation. Confidence is always `u16::MAX`.
     #[must_use]
     pub fn new_quality(
-        timestamp_us: u64,
+        timestamp: MonotonicTimestamp,
         quality: Quality,
         session_id: u64,
         attestation: [u8; 8],
@@ -138,31 +115,43 @@ impl IntentObservation {
         let mut payload = [0u8; 4];
         payload[0] = quality as u8;
         Self {
-            timestamp_us,
+            timestamp_us: timestamp.as_micros(),
             kind_tag: KindTag::QUALITY,
-            quality_raw: u16::MAX, // quality events are always full-confidence
+            quality_raw: u16::MAX,
             payload,
             session_id,
             attestation,
         }
     }
 
-    /// Timestamp in microseconds since session start.
+    /// Timestamp as [`MonotonicTimestamp`].
+    #[must_use]
+    pub const fn timestamp(&self) -> MonotonicTimestamp {
+        MonotonicTimestamp::from_micros_unchecked(self.timestamp_us)
+    }
+
+    /// Raw timestamp in microseconds.
     #[must_use]
     pub const fn timestamp_us(&self) -> u64 {
         self.timestamp_us
     }
 
-    /// Timestamp wrapper type for richer APIs.
+    /// Q0.16 fixed-point confidence. `u16::MAX == 1.0`.
     #[must_use]
-    pub const fn timestamp(&self) -> Timestamp {
-        Timestamp(self.timestamp_us)
+    pub const fn confidence_raw(&self) -> u16 {
+        self.quality_raw
     }
 
-    /// Classifier confidence in the range `[0.0, 1.0]`.
+    /// Confidence as f32 for **display only**. Do not use for comparison
+    /// or decision logic — use `confidence_raw()` instead.
+    ///
+    /// # Non-determinism warning
+    /// This conversion uses floating-point division and may produce
+    /// slightly different results across architectures. Always compare
+    /// raw values for correctness.
     #[must_use]
-    pub fn confidence(&self) -> f32 {
-        f32::from(self.quality_raw) / f32::from(u16::MAX)
+    pub fn confidence_f32(&self) -> f32 {
+        f32::from(self.quality_raw) / f32::from(crate::CONFIDENCE_DENOM)
     }
 
     /// Opaque session identifier.
@@ -177,31 +166,18 @@ impl IntentObservation {
         &self.attestation
     }
 
-    /// Decoded intent kind. Returns `None` if the `kind_tag` is unrecognized —
-    /// this occurs when the SDK is older than the kernel.
+    /// Decoded intent kind. Returns `Unknown` for unrecognized tags.
     #[must_use]
     pub fn kind(&self) -> IntentKind {
         match self.kind_tag {
             KindTag::DIRECTION => {
-                if let Some(d) = Direction::from_u8(self.payload[0]) {
-                    IntentKind::Direction(d)
-                } else {
-                    IntentKind::Unknown
-                }
+                Direction::from_u8(self.payload[0]).map_or(IntentKind::Unknown, IntentKind::Direction)
             }
             KindTag::LOAD => {
-                if let Some(l) = Load::from_u8(self.payload[0]) {
-                    IntentKind::Load(l)
-                } else {
-                    IntentKind::Unknown
-                }
+                Load::from_u8(self.payload[0]).map_or(IntentKind::Unknown, IntentKind::Load)
             }
             KindTag::QUALITY => {
-                if let Some(q) = Quality::from_u8(self.payload[0]) {
-                    IntentKind::Quality(q)
-                } else {
-                    IntentKind::Unknown
-                }
+                Quality::from_u8(self.payload[0]).map_or(IntentKind::Unknown, IntentKind::Quality)
             }
             _ => IntentKind::Unknown,
         }
@@ -211,9 +187,9 @@ impl IntentObservation {
 impl fmt::Debug for IntentObservation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("IntentObservation")
-            .field("timestamp_us", &self.timestamp_us)
+            .field("timestamp", &self.timestamp())
             .field("kind", &self.kind())
-            .field("confidence", &self.confidence())
+            .field("confidence_raw", &self.quality_raw)
             .field("session_id", &format_args!("{:#018x}", self.session_id))
             .finish_non_exhaustive()
     }
@@ -229,7 +205,7 @@ impl serde::Serialize for IntentObservation {
         let mut st = s.serialize_struct("IntentObservation", 5)?;
         st.serialize_field("timestamp_us", &self.timestamp_us)?;
         st.serialize_field("kind", &self.kind())?;
-        st.serialize_field("confidence", &self.confidence())?;
+        st.serialize_field("confidence_raw", &self.quality_raw)?;
         st.serialize_field("session_id", &self.session_id)?;
         st.serialize_field("attestation", &self.attestation)?;
         st.end()
@@ -260,7 +236,7 @@ impl<'de> serde::Deserialize<'de> for IntentObservation {
             {
                 let mut timestamp_us = None;
                 let mut kind = None::<IntentKind>;
-                let mut confidence = None::<f32>;
+                let mut confidence_raw = None::<u16>;
                 let mut session_id = None;
                 let mut attestation = None::<[u8; 8]>;
 
@@ -268,7 +244,7 @@ impl<'de> serde::Deserialize<'de> for IntentObservation {
                     match key {
                         "timestamp_us" => timestamp_us = Some(map.next_value()?),
                         "kind" => kind = Some(map.next_value()?),
-                        "confidence" => confidence = Some(map.next_value()?),
+                        "confidence_raw" => confidence_raw = Some(map.next_value()?),
                         "session_id" => session_id = Some(map.next_value()?),
                         "attestation" => attestation = Some(map.next_value()?),
                         _ => { let _ = map.next_value::<de::IgnoredAny>()?; }
@@ -277,75 +253,42 @@ impl<'de> serde::Deserialize<'de> for IntentObservation {
 
                 let timestamp_us = timestamp_us.ok_or_else(|| de::Error::missing_field("timestamp_us"))?;
                 let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
-                let confidence = confidence.unwrap_or(1.0);
+                let confidence_raw = confidence_raw.unwrap_or(u16::MAX);
                 let session_id = session_id.ok_or_else(|| de::Error::missing_field("session_id"))?;
                 let attestation = attestation.ok_or_else(|| de::Error::missing_field("attestation"))?;
 
                 let obs = match kind {
                     IntentKind::Direction(d) => {
-                        IntentObservation::new_direction(timestamp_us, d, confidence, session_id, attestation)
+                        IntentObservation::new_direction(
+                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                            d, confidence_raw, session_id, attestation
+                        )
                     }
                     IntentKind::Load(l) => {
-                        IntentObservation::new_load(timestamp_us, l, confidence, session_id, attestation)
+                        IntentObservation::new_load(
+                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                            l, confidence_raw, session_id, attestation
+                        )
                     }
                     IntentKind::Quality(q) => {
-                        IntentObservation::new_quality(timestamp_us, q, session_id, attestation)
+                        IntentObservation::new_quality(
+                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                            q, session_id, attestation
+                        )
                     }
                     IntentKind::Unknown => {
-                        return Err(de::Error::custom("cannot deserialize Unknown intent kind into concrete observation"));
+                        return Err(de::Error::custom("cannot deserialize Unknown into concrete observation"));
                     }
                 };
                 Ok(obs)
             }
         }
 
-        d.deserialize_struct("IntentObservation", &["timestamp_us", "kind", "confidence", "session_id", "attestation"], ObsVisitor)
+        d.deserialize_struct("IntentObservation", &["timestamp_us", "kind", "confidence_raw", "session_id", "attestation"], ObsVisitor)
     }
 }
 
-fn confidence_to_raw(c: f32) -> u16 {
-    let clamped = if c < 0.0 {
-        0.0
-    } else if c > 1.0 {
-        1.0
-    } else {
-        c
-    };
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    {
-        (clamped * f32::from(u16::MAX)) as u16
-    }
-}
-
-/// Timestamp wrapper, microseconds since session start.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Timestamp(u64);
-
-impl Timestamp {
-    /// Raw microseconds value.
-    #[must_use]
-    pub const fn as_micros(self) -> u64 {
-        self.0
-    }
-
-    /// Value in milliseconds, truncated.
-    #[must_use]
-    pub const fn as_millis(self) -> u64 {
-        self.0 / 1000
-    }
-
-    /// Duration since another timestamp, in microseconds.
-    #[must_use]
-    pub const fn checked_sub(self, earlier: Timestamp) -> Option<u64> {
-        if self.0 >= earlier.0 {
-            Some(self.0 - earlier.0)
-        } else {
-            None
-        }
-    }
-}
-
-/// Discriminant tags — internal to the wire format.
+/// Internal discriminant tags.
 struct KindTag;
 impl KindTag {
     const DIRECTION: u16 = 0x0001;
@@ -353,42 +296,27 @@ impl KindTag {
     const QUALITY: u16 = 0x0003;
 }
 
-/// Classified intent kind. Variants are discriminated at the wire level
-/// by [`IntentObservation::kind_tag`].
+/// Classified intent kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "snake_case"))]
 pub enum IntentKind {
-    /// A navigation direction intent.
     Direction(Direction),
-    /// A cognitive workload assessment.
     Load(Load),
-    /// A signal-quality event.
     Quality(Quality),
-    /// The kernel delivered an event of a kind this SDK does not understand.
-    /// Applications should ignore these gracefully (forward compatibility).
     Unknown,
 }
 
 /// Cardinal direction for navigation intents.
-///
-/// Values are deliberately chosen so the numeric order matches a clock-face
-/// reading (Up=0, Right=1, Down=2, Left=3), which simplifies integration
-/// with 2D cursor control loops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Direction {
-    /// Up.
     Up = 0,
-    /// Right.
     Right = 1,
-    /// Down.
     Down = 2,
-    /// Left.
     Left = 3,
-    /// Explicit no-direction / neutral.
     Neutral = 4,
 }
 
@@ -411,11 +339,8 @@ impl Direction {
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Load {
-    /// Low cognitive load.
     Low = 0,
-    /// Moderate cognitive load.
     Moderate = 1,
-    /// High cognitive load.
     High = 2,
 }
 
@@ -430,21 +355,15 @@ impl Load {
     }
 }
 
-/// Signal quality class — reported periodically so applications can gracefully
-/// degrade when electrode contact is poor.
+/// Signal quality class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Quality {
-    /// High-quality signal. Classifier output should be trusted.
     High = 0,
-    /// Moderate quality. Applications should cross-check with other inputs.
     Moderate = 1,
-    /// Low quality. Classifier output is unreliable and should typically be
-    /// rejected by the application.
     Low = 2,
-    /// No signal / electrodes detached.
     NoSignal = 3,
 }
 
@@ -465,45 +384,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn observation_is_32_bytes() {
+    fn observation_is_32_bytes_on_64bit() {
         assert_eq!(core::mem::size_of::<IntentObservation>(), 32);
     }
 
     #[test]
+    fn observation_align_is_8() {
+        assert_eq!(core::mem::align_of::<IntentObservation>(), 8);
+    }
+
+    #[test]
     fn direction_round_trip() {
-        for d in [
-            Direction::Up,
-            Direction::Right,
-            Direction::Down,
-            Direction::Left,
-            Direction::Neutral,
-        ] {
-            let obs = IntentObservation::new_direction(0, d, 0.5, 0, [0u8; 8]);
+        for d in [Direction::Up, Direction::Right, Direction::Down, Direction::Left, Direction::Neutral] {
+            let ts = MonotonicTimestamp::from_micros_unchecked(0);
+            let obs = IntentObservation::new_direction(ts, d, 32768, 0, [0u8; 8]);
             assert_eq!(obs.kind(), IntentKind::Direction(d));
         }
     }
 
     #[test]
     fn unknown_tag_maps_to_unknown() {
-        let mut obs = IntentObservation::new_direction(0, Direction::Up, 0.5, 0, [0u8; 8]);
-        obs.kind_tag = 0xFFFF; // pretend kernel sent unknown type
+        let ts = MonotonicTimestamp::from_micros_unchecked(0);
+        let mut obs = IntentObservation::new_direction(ts, Direction::Up, 0, 0, [0u8; 8]);
+        obs.kind_tag = 0xFFFF;
         assert_eq!(obs.kind(), IntentKind::Unknown);
     }
 
     #[test]
-    fn confidence_is_clamped() {
-        let obs = IntentObservation::new_direction(0, Direction::Up, 2.0, 0, [0u8; 8]);
-        assert!((obs.confidence() - 1.0).abs() < 0.001);
-        let obs = IntentObservation::new_direction(0, Direction::Up, -0.5, 0, [0u8; 8]);
-        assert!(obs.confidence().abs() < 0.001);
+    fn confidence_is_fixed_point() {
+        let ts = MonotonicTimestamp::from_micros_unchecked(0);
+        let obs = IntentObservation::new_direction(ts, Direction::Up, 65535, 0, [0u8; 8]);
+        assert_eq!(obs.confidence_raw(), 65535);
+        assert!((obs.confidence_f32() - 1.0).abs() < 0.0001);
     }
 
     #[test]
-    fn timestamp_arithmetic() {
-        let t1 = Timestamp(1000);
-        let t2 = Timestamp(2500);
-        assert_eq!(t2.checked_sub(t1), Some(1500));
-        assert_eq!(t1.checked_sub(t2), None);
-        assert_eq!(t2.as_millis(), 2);
+    fn timestamp_is_monotonic_type() {
+        let ts = MonotonicTimestamp::from_micros_unchecked(1234);
+        let obs = IntentObservation::new_direction(ts, Direction::Up, 0, 0, [0u8; 8]);
+        assert_eq!(obs.timestamp().as_micros(), 1234);
     }
 }

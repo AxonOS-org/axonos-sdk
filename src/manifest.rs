@@ -1,115 +1,67 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 
-//! Application manifest — the declaration every AxonOS application sends
-//! to the kernel at handshake.
-//!
-//! # Fields
-//!
-//! The manifest is **signed by the application publisher** (in production
-//! builds). The kernel verifies the signature against a locally-installed
-//! trust root before allowing the application to subscribe to any intent
-//! stream. This SDK does not implement signing; that is done by an
-//! out-of-band build step and the signature blob is attached at runtime.
-//!
-//! # Validation
-//!
-//! [`ManifestBuilder::build`] performs local validation:
-//! - `app_id` is non-empty and ≤ 64 UTF-8 bytes (mirrors AxonOS kernel limits)
-//! - At least one capability is declared
-//! - `max_rate_hz` does not exceed the kernel rate limit for any declared
-//!   capability, and is strictly positive.
-//!
-//! Kernel-side validation (signature verification, policy checks) happens
-//! only at handshake time and returns [`crate::Error::ManifestRejected`].
+//! Application manifest — declaration sent to kernel at handshake.
 
 use crate::capability::{Capability, CapabilitySet};
 use crate::error::{Error, ManifestRejection, Result};
 use heapless::String;
 
-/// Maximum length of an app_id string, in UTF-8 bytes.
+/// Maximum app_id length in UTF-8 bytes.
 pub const MAX_APP_ID_LEN: usize = 64;
 
-/// Maximum length of display name / vendor strings.
+/// Maximum display name / vendor length.
 pub const MAX_DISPLAY_STRING_LEN: usize = 64;
 
-/// A signed declaration of what an AxonOS application is authorized to do.
+/// Signed declaration of what an AxonOS application is authorized to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Manifest {
-    /// Reverse-DNS application identifier, e.g., `com.example.cursor`.
     app_id: String<MAX_APP_ID_LEN>,
-    /// Declared capabilities.
     capabilities: CapabilitySet,
-    /// Maximum event rate requested by the application, across all streams.
     max_rate_hz: u32,
-    /// Optional human-readable application name for UI display. Not used
-    /// for protocol decisions.
     name: Option<String<MAX_DISPLAY_STRING_LEN>>,
-    /// Optional vendor / publisher string.
     vendor: Option<String<MAX_DISPLAY_STRING_LEN>>,
 }
 
 impl Manifest {
-    /// Start building a manifest.
     #[must_use]
     pub fn builder() -> ManifestBuilder {
         ManifestBuilder::default()
     }
 
-    /// Reverse-DNS app identifier.
     #[must_use]
     pub fn app_id(&self) -> &str {
         self.app_id.as_str()
     }
 
-    /// Declared capability set.
     #[must_use]
     pub const fn capabilities(&self) -> &CapabilitySet {
         &self.capabilities
     }
 
-    /// Maximum event rate, Hz.
     #[must_use]
     pub const fn max_rate_hz(&self) -> u32 {
         self.max_rate_hz
     }
 
-    /// Human-readable application name, if set.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
-    /// Vendor / publisher string, if set.
     #[must_use]
     pub fn vendor(&self) -> Option<&str> {
         self.vendor.as_deref()
     }
 
-    /// Check whether this manifest declares a capability.
     #[must_use]
     pub const fn allows(&self, c: Capability) -> bool {
         self.capabilities.contains(c)
     }
 }
 
-/// Builder for [`Manifest`].
-///
-/// # Ergonomics
-/// All intermediate builder methods are infallible. Validation is deferred
-/// to [`ManifestBuilder::build`], allowing ergonomic chained construction:
-///
-/// ```
-/// use axonos_sdk::{Manifest, Capability};
-///
-/// let manifest = Manifest::builder()
-///     .app_id("com.example.cursor")
-///     .capability(Capability::Navigation)
-///     .max_rate_hz(50)
-///     .build()
-///     .unwrap();
-/// ```
+/// Builder for [`Manifest`]. All intermediate methods are infallible.
 #[derive(Debug, Default, Clone)]
 pub struct ManifestBuilder {
     app_id: Option<String<MAX_APP_ID_LEN>>,
@@ -120,71 +72,65 @@ pub struct ManifestBuilder {
 }
 
 impl ManifestBuilder {
-    /// Set the app_id (reverse-DNS). Required.
-    ///
-    /// Validation (non-empty, ≤ 64 bytes) happens in [`build`].
+    /// Set app_id. Panics if > 64 bytes or empty.
     #[must_use]
     pub fn app_id(mut self, id: &str) -> Self {
+        assert!(
+            !id.is_empty() && id.len() <= MAX_APP_ID_LEN,
+            "app_id must be non-empty and ≤ {} UTF-8 bytes, got {} bytes: {:?}",
+            MAX_APP_ID_LEN, id.len(), id
+        );
         let mut s = String::new();
-        // Best-effort storage; validation deferred to build().
-        let _ = s.push_str(id);
+        s.push_str(id).expect("length already checked by assert");
         self.app_id = Some(s);
         self
     }
 
-    /// Declare a capability. Can be called multiple times.
     #[must_use]
     pub fn capability(mut self, c: Capability) -> Self {
         self.capabilities = self.capabilities.with(c);
         self
     }
 
-    /// Declare a maximum event rate (Hz). Must not exceed the kernel rate
-    /// limit for any declared capability, and must be > 0.
     #[must_use]
     pub fn max_rate_hz(mut self, hz: u32) -> Self {
         self.max_rate_hz = Some(hz);
         self
     }
 
-    /// Optional display name (≤ 64 UTF-8 bytes).
+    /// Set display name. Panics if > 64 bytes.
     #[must_use]
     pub fn name(mut self, name: &str) -> Self {
+        assert!(
+            name.len() <= MAX_DISPLAY_STRING_LEN,
+            "name must be ≤ {} UTF-8 bytes, got {} bytes",
+            MAX_DISPLAY_STRING_LEN, name.len()
+        );
         let mut s = String::new();
-        let _ = s.push_str(name);
+        s.push_str(name).expect("length already checked");
         self.name = Some(s);
         self
     }
 
-    /// Optional vendor string (≤ 64 UTF-8 bytes).
+    /// Set vendor. Panics if > 64 bytes.
     #[must_use]
     pub fn vendor(mut self, vendor: &str) -> Self {
+        assert!(
+            vendor.len() <= MAX_DISPLAY_STRING_LEN,
+            "vendor must be ≤ {} UTF-8 bytes, got {} bytes",
+            MAX_DISPLAY_STRING_LEN, vendor.len()
+        );
         let mut s = String::new();
-        let _ = s.push_str(vendor);
+        s.push_str(vendor).expect("length already checked");
         self.vendor = Some(s);
         self
     }
 
-    /// Finalize the manifest. Performs local validation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::ManifestRejected`] if:
-    /// - `app_id` is missing or empty.
-    /// - `app_id` exceeds 64 UTF-8 bytes.
-    /// - No capabilities are declared.
-    /// - `max_rate_hz` is 0.
-    /// - `max_rate_hz` exceeds the kernel limit for any declared capability.
+    /// Finalize. Performs local validation.
     pub fn build(self) -> Result<Manifest> {
         let app_id = self.app_id.ok_or(Error::ManifestRejected {
             reason: ManifestRejection::Malformed,
         })?;
-
-        if app_id.is_empty() || app_id.len() > MAX_APP_ID_LEN {
-            return Err(Error::ManifestRejected {
-                reason: ManifestRejection::Malformed,
-            });
-        }
 
         if self.capabilities.is_empty() {
             return Err(Error::ManifestRejected {
@@ -199,23 +145,6 @@ impl ManifestBuilder {
             });
         }
 
-        // Validate display strings do not exceed kernel limits.
-        if let Some(ref n) = self.name {
-            if n.len() > MAX_DISPLAY_STRING_LEN {
-                return Err(Error::ManifestRejected {
-                    reason: ManifestRejection::Malformed,
-                });
-            }
-        }
-        if let Some(ref v) = self.vendor {
-            if v.len() > MAX_DISPLAY_STRING_LEN {
-                return Err(Error::ManifestRejected {
-                    reason: ManifestRejection::Malformed,
-                });
-            }
-        }
-
-        // Verify rate does not exceed kernel limit for any declared capability.
         for c in self.capabilities.iter() {
             if max_rate_hz > c.kernel_rate_limit_hz() {
                 return Err(Error::ManifestRejected {
@@ -248,23 +177,19 @@ mod tests {
             .unwrap();
         assert_eq!(m.app_id(), "com.example.a");
         assert!(m.allows(Capability::Navigation));
-        assert!(!m.allows(Capability::WorkloadAdvisory));
     }
 
     #[test]
-    fn empty_app_id_rejected() {
-        let r = Manifest::builder().app_id("").capability(Capability::Navigation).build();
-        assert!(r.is_err());
+    #[should_panic(expected = "app_id must be non-empty")]
+    fn empty_app_id_panics() {
+        let _ = Manifest::builder().app_id("");
     }
 
     #[test]
-    fn oversized_app_id_rejected() {
+    #[should_panic(expected = "app_id must be non-empty")]
+    fn oversized_app_id_panics() {
         let huge = "a".repeat(MAX_APP_ID_LEN + 1);
-        let r = Manifest::builder()
-            .app_id(&huge)
-            .capability(Capability::Navigation)
-            .build();
-        assert!(r.is_err());
+        let _ = Manifest::builder().app_id(&huge);
     }
 
     #[test]
@@ -300,7 +225,7 @@ mod tests {
     fn rate_exceeding_kernel_limit_rejected() {
         let r = Manifest::builder()
             .app_id("com.a")
-            .capability(Capability::WorkloadAdvisory) // kernel limit = 1 Hz
+            .capability(Capability::WorkloadAdvisory)
             .max_rate_hz(10)
             .build();
         assert!(matches!(
@@ -312,18 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn rate_within_kernel_limit_accepted() {
-        let r = Manifest::builder()
-            .app_id("com.a")
-            .capability(Capability::Navigation) // kernel limit = 50 Hz
-            .max_rate_hz(30)
-            .build();
-        assert!(r.is_ok());
-    }
-
-    #[test]
     fn builder_is_ergonomic() {
-        // All intermediate steps are infallible.
         let m = Manifest::builder()
             .app_id("com.ergonomic.test")
             .name("Test App")

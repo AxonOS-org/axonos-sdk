@@ -1,147 +1,105 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 
-//! Mesh integration — MMP Consent Extension client.
+//! Mesh integration — MMP Consent Extension client facade.
 //!
-//! Applications that participate in a cognitive mesh use [`MeshClient`]
-//! to issue consent-related protocol frames on behalf of the user. The
-//! actual protocol implementation (CBOR codec, state machine, invariants)
-//! lives in the separate [`axonos-consent`](https://crates.io/crates/axonos-consent)
-//! crate — this module is a thin facade that binds the user interface
-//! surface to the protocol library.
+//! # ⚠️ Stub status
 //!
-//! # Scope model
+//! This module provides a **typed API surface only**. The actual protocol
+//! implementation (CBOR codec, state machine, wire transport) lives in the
+//! separate `axonos-consent` crate. Until kernel integration ships, all
+//! methods are no-ops returning `Ok(())`.
 //!
-//! Withdrawing consent can target a specific peer or all peers in the
-//! mesh — see [`ConsentScope`].
-//!
-//! # Correspondence with the MMP Consent Extension
-//!
-//! | `MeshClient` call | MMP frame | Spec section |
-//! |:---|:---|:---:|
-//! | `withdraw_consent(Peer(x))` | `consent-withdraw` scope=peer | §3.1 |
-//! | `withdraw_consent(All)` | `consent-withdraw` scope=all | §3.1 |
-//! | `suspend_consent()` | `consent-suspend` | §3.2 |
-//! | `resume_consent()` | `consent-resume` | §3.3 |
+//! Do not mistake `MeshClientStub` for a working client — it is a
+//! **compile-time contract** that ensures downstream code will not break
+//! when the real implementation arrives.
 
 use crate::error::Result;
 
-/// Peer identifier — typically a ULID or public-key hash, 16 bytes.
-///
-/// The AxonOS SDK treats this as an opaque blob; the interpretation is
-/// defined by the MMP base protocol.
+/// Peer identifier — 16 bytes opaque blob.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PeerId(pub [u8; 16]);
 
 impl PeerId {
-    /// Construct from raw bytes.
     #[must_use]
     pub const fn from_bytes(b: [u8; 16]) -> Self {
         Self(b)
     }
 
-    /// Raw bytes.
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
 }
 
-/// Scope of a consent-withdraw or consent-suspend operation.
+/// Scope of consent operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "scope", rename_all = "snake_case"))]
 pub enum ConsentScope {
-    /// Target a single named peer.
     Peer(PeerId),
-    /// Target every peer currently in the mesh session.
     All,
 }
 
-/// Reason code for a consent-withdraw frame. Mirrors the spec §3.4 registry.
+/// Withdraw reason per MMP Consent Extension §3.4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(u8)]
 pub enum WithdrawReason {
-    /// No specific reason given. Default.
     Unspecified = 0x00,
-    /// User pressed a disconnect button or issued an equivalent action.
     UserInitiated = 0x01,
-    /// A safety invariant was violated by a peer (e.g., SVAF rejected).
     SafetyViolation = 0x02,
-    /// Hardware fault in the local device — e.g., electrode disconnected,
-    /// over-temperature.
     HardwareFault = 0x03,
 }
 
-/// A client for the MMP mesh consent surface.
+/// **Stub** implementation of the MMP mesh consent client.
 ///
-/// # Implementation note
+/// # Warning
+/// This is **not a real client**. All methods are no-ops until the
+/// `axonos-consent` crate provides a backing implementation.
 ///
-/// This facade does not itself speak the protocol. On `std` builds it
-/// delegates to a local `axonos-consent`-backed session; on no_std builds
-/// it generates typed request descriptors that the kernel's mesh task
-/// executes. Either way, the application-level API is identical.
+/// When the kernel ships, this type will be replaced by a real
+/// `MeshClient` that speaks the wire protocol. The API surface
+/// (method signatures) will remain identical.
 #[derive(Debug)]
-pub struct MeshClient {
+pub struct MeshClientStub {
     session_id: u64,
-    connected: bool,
 }
 
-impl MeshClient {
-    /// Construct a new, unconnected mesh client.
+impl MeshClientStub {
     #[must_use]
     pub const fn new(session_id: u64) -> Self {
-        Self {
-            session_id,
-            connected: false,
-        }
+        Self { session_id }
     }
 
-    /// Session identifier this client is bound to.
     #[must_use]
     pub const fn session_id(&self) -> u64 {
         self.session_id
     }
 
-    /// Whether the client has performed a successful handshake.
-    #[must_use]
-    pub const fn is_connected(&self) -> bool {
-        self.connected
-    }
-
-    /// Request a consent-withdraw frame to be emitted by the local consent
-    /// engine.
+    /// Request a consent-withdraw frame.
     ///
-    /// # Errors
-    ///
-    /// - [`crate::Error::TransportUnreachable`] if the kernel endpoint is
-    ///   unavailable.
-    /// - [`crate::Error::ConsentWithdrawn`] if consent is already withdrawn
-    ///   for the target scope (terminal — the caller should not retry).
+    /// # Current behavior
+    /// No-op. Returns `Ok(())` unconditionally.
     pub fn withdraw_consent(&self, scope: ConsentScope, reason: WithdrawReason) -> Result<()> {
-        // The full implementation delegates to axonos-consent. This SDK
-        // exposes the typed API; the kernel mesh task emits the frame.
         let _ = (scope, reason);
         Ok(())
     }
 
-    /// Request a consent-suspend frame (§3.2).
+    /// Request a consent-suspend frame.
     ///
-    /// # Errors
-    ///
-    /// Same as [`MeshClient::withdraw_consent`].
+    /// # Current behavior
+    /// No-op. Returns `Ok(())` unconditionally.
     pub fn suspend_consent(&self, scope: ConsentScope) -> Result<()> {
         let _ = scope;
         Ok(())
     }
 
-    /// Request a consent-resume frame (§3.3).
+    /// Request a consent-resume frame.
     ///
-    /// # Errors
-    ///
-    /// Same as [`MeshClient::withdraw_consent`].
+    /// # Current behavior
+    /// No-op. Returns `Ok(())` unconditionally.
     pub fn resume_consent(&self, scope: ConsentScope) -> Result<()> {
         let _ = scope;
         Ok(())
@@ -163,7 +121,6 @@ mod tests {
 
     #[test]
     fn reason_codes_match_spec() {
-        // Stable wire values per MMP Consent Extension §3.4.
         assert_eq!(WithdrawReason::Unspecified as u8, 0x00);
         assert_eq!(WithdrawReason::UserInitiated as u8, 0x01);
         assert_eq!(WithdrawReason::SafetyViolation as u8, 0x02);
@@ -171,9 +128,8 @@ mod tests {
     }
 
     #[test]
-    fn client_starts_disconnected() {
-        let c = MeshClient::new(0xDEAD_BEEF);
-        assert!(!c.is_connected());
+    fn stub_has_session_id() {
+        let c = MeshClientStub::new(0xDEAD_BEEF);
         assert_eq!(c.session_id(), 0xDEAD_BEEF);
     }
 }

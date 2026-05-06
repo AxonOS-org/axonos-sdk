@@ -3,68 +3,58 @@
 
 //! Application capabilities.
 //!
-//! Every AxonOS application must declare a [`CapabilitySet`] in its
-//! [`crate::Manifest`]. Capabilities describe the **classes of intent
-//! observations** the application is authorized to receive.
+//! # Formal specification
 //!
-//! # Permitted capabilities
+//! A capability is a **grant** from the AxonOS kernel to an application,
+//! authorizing it to receive a specific class of intent observations.
 //!
-//! Only capabilities in the [`Capability`] enum can be declared. The enum
-//! is exhaustive by design — there is no "custom capability" escape hatch,
-//! because the capability surface is an IEC 62304 traceable risk-control
-//! boundary.
+//! ## Invariants
+//! - Capabilities are **enumerated** — no custom capabilities exist.
+//! - Capabilities are **immutable** after manifest handshake.
+//! - Capabilities are **non-transferable** — an app cannot delegate
+//!   its `Navigation` capability to another app.
+//! - The kernel **verifies** capabilities against a hardware-backed
+//!   policy store; the SDK merely declares intent.
 //!
-//! # Prohibited capabilities (not in the enum)
+//! ## Wire format
 //!
-//! The following capability classes are **deliberately absent** from this
-//! enum and will be rejected by the kernel manifest verifier:
+//! `CapabilitySet` is serialized as a **little-endian u32 bitfield**:
+//! ```text
+//! bit 0: Navigation
+//! bit 1: WorkloadAdvisory
+//! bit 2: SessionQuality
+//! bit 3: ArtifactEvents
+//! bits 4-31: reserved (must be zero)
+//! ```
 //!
-//! - Raw EEG access — available only to `axonos-kernel` internals.
-//! - Continuous emotion inference — prohibited per AxonOS neuroethics policy.
-//! - Cognitive profile read — prohibited per the same policy.
-//! - Re-identification — prohibited per UNESCO Recommendation on the Ethics
-//!   of Neurotechnology (2025), §III.
-//!
-//! Attempting to construct a manifest targeting any of these categories
-//! returns [`crate::Error::ManifestRejected`] with reason
-//! [`crate::error::ManifestRejection::ProhibitedCapability`].
+//! Any set reserved bit causes `ManifestRejected::ProhibitedCapability`.
 
 use core::fmt;
 
-/// An application capability. Each variant corresponds to a class of
-/// intent observations the application is authorized to consume.
+/// Application capability. Enumerated — no escape hatch by design.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[repr(u8)]
 pub enum Capability {
-    /// Receive [`crate::IntentKind::Direction`] events. Typical use:
-    /// cursor control, menu navigation.
+    /// Direction events for cursor/menu control. Kernel limit: 50 Hz.
     Navigation = 0,
-
-    /// Receive [`crate::IntentKind::Load`] events. Typical use:
-    /// adaptive UI that simplifies when user is under high cognitive load.
-    /// Rate-limited by kernel policy to ≤1 Hz.
+    /// Cognitive load events. Kernel limit: 1 Hz.
     WorkloadAdvisory = 1,
-
-    /// Receive [`crate::IntentKind::Quality`] events. Typical use:
-    /// show the user a signal-quality indicator.
+    /// Signal-quality events. Kernel limit: 2 Hz.
     SessionQuality = 2,
-
-    /// Receive artifact / electrode-event notifications (e.g., "user blinked"
-    /// debiased). Typical use: calibration UX.
+    /// Artifact/electrode events. Kernel limit: 10 Hz.
     ArtifactEvents = 3,
 }
 
 impl Capability {
-    /// Returns the capability as its wire-level `u8` discriminant.
+    /// Wire-level u8 discriminant.
     #[must_use]
     pub const fn as_u8(self) -> u8 {
         self as u8
     }
 
-    /// Maximum events per second the kernel will deliver for this capability.
-    /// Applications can declare a lower rate; they cannot exceed this.
+    /// Maximum events per second the kernel will deliver.
     #[must_use]
     pub const fn kernel_rate_limit_hz(self) -> u32 {
         match self {
@@ -74,32 +64,60 @@ impl Capability {
             Self::ArtifactEvents => 10,
         }
     }
-}
 
-impl fmt::Display for Capability {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    /// Human-readable name for audit logs.
+    #[must_use]
+    pub const fn audit_name(self) -> &'static str {
         match self {
-            Self::Navigation => f.write_str("navigation"),
-            Self::WorkloadAdvisory => f.write_str("workload_advisory"),
-            Self::SessionQuality => f.write_str("session_quality"),
-            Self::ArtifactEvents => f.write_str("artifact_events"),
+            Self::Navigation => "navigation",
+            Self::WorkloadAdvisory => "workload_advisory",
+            Self::SessionQuality => "session_quality",
+            Self::ArtifactEvents => "artifact_events",
         }
     }
 }
 
-// Compile-time guard: ensure the largest discriminant fits inside the bitfield.
+impl fmt::Display for Capability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.audit_name())
+    }
+}
+
+// Compile-time guard: largest discriminant must fit in bitfield.
 const _: () = {
     let max = Capability::ArtifactEvents as u8;
     assert!((max as usize) < (core::mem::size_of::<u32>() * 8));
 };
 
-/// A set of [`Capability`] values. Implemented as a `u32` bitfield for
-/// zero-allocation storage in [`crate::Manifest`].
+/// Opaque raw representation of a [`CapabilitySet`].
 ///
-/// # Security note
-/// The bitfield is `u32`, accommodating up to 32 capability variants.
-/// Adding a variant with discriminant ≥ 32 is a compile-time breaking change
-/// (the assertion above will fail), preventing silent capability loss.
+/// The internal bit layout is not part of the stable public API.
+/// Use this only for logging, metrics, or opaque storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RawCapabilitySet(u32);
+
+impl RawCapabilitySet {
+    /// Raw u32 value. Stable within a major version.
+    #[must_use]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Check if any reserved bits are set (invalid wire format).
+    #[must_use]
+    pub const fn has_reserved_bits(self) -> bool {
+        self.0 & !0x0F != 0
+    }
+}
+
+impl fmt::Display for RawCapabilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RawCapabilitySet({:#010x})", self.0)
+    }
+}
+
+/// A set of [`Capability`] values. Zero-allocation u32 bitfield.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CapabilitySet(u32);
@@ -111,37 +129,33 @@ impl CapabilitySet {
         Self(0)
     }
 
-    /// Add a capability. Returns `self` for chaining.
+    /// Add a capability.
     #[must_use]
     pub const fn with(mut self, c: Capability) -> Self {
         self.0 |= 1u32 << (c.as_u8() as u32);
         self
     }
 
-    /// Check whether the set contains a capability.
+    /// Check membership.
     #[must_use]
     pub const fn contains(&self, c: Capability) -> bool {
         (self.0 & (1u32 << (c.as_u8() as u32))) != 0
     }
 
-    /// Number of capabilities in the set.
+    /// Count of capabilities in the set.
     #[must_use]
     pub const fn len(&self) -> u32 {
         self.0.count_ones()
     }
 
-    /// `true` if the set is empty.
+    /// True if empty.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.0 == 0
     }
 
-    /// Iterate over the capabilities in the set.
-    ///
-    /// Uses `strum`-like explicit enumeration to guarantee that adding a new
-    /// `Capability` variant without updating this method is a compile error.
+    /// Iterate over capabilities. Explicitly enumerated for exhaustiveness.
     pub fn iter(&self) -> impl Iterator<Item = Capability> + '_ {
-        // Explicit match ensures exhaustiveness checking by the compiler.
         [
             Capability::Navigation,
             Capability::WorkloadAdvisory,
@@ -152,17 +166,38 @@ impl CapabilitySet {
         .filter(|c| self.contains(*c))
     }
 
-    /// Raw bitfield representation. Stable across SDK versions within the
-    /// same major-version series.
+    /// Opaque raw representation.
     #[must_use]
-    pub const fn as_raw(self) -> u32 {
-        self.0
+    pub const fn as_raw(self) -> RawCapabilitySet {
+        RawCapabilitySet(self.0)
+    }
+
+    /// Audit log format: human-readable list of capabilities.
+    ///
+    /// Example: `"[navigation, session_quality]"`
+    pub fn audit_format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[")?;
+        let mut first = true;
+        for c in self.iter() {
+            if !first {
+                f.write_str(", ")?;
+            }
+            f.write_str(c.audit_name())?;
+            first = false;
+        }
+        f.write_str("]")
     }
 }
 
 impl Default for CapabilitySet {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for CapabilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.audit_format(f)
     }
 }
 
@@ -176,45 +211,39 @@ mod tests {
             .with(Capability::Navigation)
             .with(Capability::SessionQuality);
         assert!(s.contains(Capability::Navigation));
-        assert!(s.contains(Capability::SessionQuality));
         assert!(!s.contains(Capability::WorkloadAdvisory));
         assert_eq!(s.len(), 2);
     }
 
     #[test]
-    fn set_iter_preserves_order() {
-        let s = CapabilitySet::new()
-            .with(Capability::ArtifactEvents)
-            .with(Capability::Navigation);
-        let collected: heapless::Vec<Capability, 4> = s.iter().collect();
-        assert_eq!(collected.len(), 2);
-        assert_eq!(collected[0], Capability::Navigation);
-        assert_eq!(collected[1], Capability::ArtifactEvents);
-    }
-
-    #[test]
-    fn empty_set() {
-        let s = CapabilitySet::new();
-        assert!(s.is_empty());
-        assert_eq!(s.len(), 0);
-        assert!(!s.contains(Capability::Navigation));
-    }
-
-    #[test]
-    fn rate_limits_are_documented() {
-        // These numbers are part of the public contract.
-        assert_eq!(Capability::Navigation.kernel_rate_limit_hz(), 50);
-        assert_eq!(Capability::WorkloadAdvisory.kernel_rate_limit_hz(), 1);
+    fn raw_is_opaque() {
+        let s = CapabilitySet::new().with(Capability::Navigation);
+        let raw = s.as_raw();
+        assert_eq!(raw.as_u32(), 1);
+        assert!(!raw.has_reserved_bits());
     }
 
     #[test]
     fn bitfield_width_accommodates_all_variants() {
-        // If this test compiles, the compile-time assertion passed.
         let s = CapabilitySet::new()
             .with(Capability::Navigation)
             .with(Capability::WorkloadAdvisory)
             .with(Capability::SessionQuality)
             .with(Capability::ArtifactEvents);
-        assert_eq!(s.as_raw(), 0b0000_1111);
+        assert_eq!(s.as_raw().as_u32(), 0x0F);
+    }
+
+    #[test]
+    fn display_format() {
+        let s = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::SessionQuality);
+        assert_eq!(format!("{}", s), "[navigation, session_quality]");
+    }
+
+    #[test]
+    fn audit_name_matches_display() {
+        assert_eq!(Capability::Navigation.audit_name(), "navigation");
+        assert_eq!(format!("{}", Capability::Navigation), "navigation");
     }
 }

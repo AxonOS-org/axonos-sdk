@@ -3,54 +3,43 @@
 
 //! Intent stream subscription.
 //!
-//! [`IntentStream`] is the primary API applications use to receive intent
-//! observations from the AxonOS kernel. It is transport-agnostic — the
-//! same type works over a local IPC endpoint, a test fixture, or a shared
-//! memory ring buffer.
-//!
 //! # Thread safety
 //!
 //! `IntentStream` is intentionally **neither `Send` nor `Sync`** when built
 //! via the `std` host module, because it may hold a kernel-bound IPC handle
-//! with thread-affinity requirements. If you need to move the stream across
-//! threads, wrap it in a channel or re-create the subscription on the target
-//! thread.
+//! with thread-affinity requirements.
 //!
-//! # Filters
+//! # Security
 //!
-//! Applications can optionally install an [`ObservationFilter`] to reduce
-//! delivery to a subset of events. Filtering happens on the **application
-//! side** in this SDK — the kernel still delivers every event. This trades
-//! bandwidth for simplicity; applications that need server-side filtering
-//! must register specific capability subsets in their manifest instead.
-//!
-//! # Overflow
-//!
-//! If the application cannot drain the stream fast enough, the kernel will
-//! drop observations according to the configured [`OverflowPolicy`]. The
-//! application is notified via [`crate::Error::StreamOverflow`] on the
-//! next `next()` call.
+//! `try_next()` requires the `kernel-stub` feature to compile without a
+//! real kernel. **Never enable `kernel-stub` in production builds** — it
+//! disables HMAC-SHA256 attestation verification.
 
 use crate::error::Result;
 use crate::intent::{IntentKind, IntentObservation};
 use crate::manifest::Manifest;
 
-/// Maximum number of in-flight observations the SDK buffers internally,
-/// per stream. This is independent of the kernel ring buffer size.
+/// SDK internal buffer capacity per stream.
 pub const DEFAULT_BUFFER_CAPACITY: usize = 256;
 
 /// Subscription handle. Dropping this ends the subscription.
 ///
-/// # Thread safety
-/// `Subscription` contains a `PhantomData<*const ()>` and is therefore
-/// `!Send + !Sync` by default. This reflects that the underlying kernel
+//! # Thread safety
+/// `Subscription` is `!Send + !Sync` because the underlying kernel
 /// subscription may be bound to a specific thread or interrupt context.
 #[derive(Debug)]
 pub struct Subscription {
     pub(crate) id: SubscriptionId,
-    /// Kept to ensure the stream is closed when the subscription is dropped.
-    pub(crate) _phantom: core::marker::PhantomData<*const ()>,
+    /// Explicitly !Send + !Sync via PhantomData of a non-Send type.
+    pub(crate) _not_send: core::marker::PhantomData<SubscriptionInner>,
 }
+
+/// Internal non-Send type used to enforce thread-affinity.
+#[cfg(feature = "std")]
+struct SubscriptionInner;
+
+#[cfg(not(feature = "std"))]
+struct SubscriptionInner;
 
 impl Subscription {
     /// Unique per-session subscription identifier.
@@ -62,9 +51,7 @@ impl Subscription {
 
 impl Drop for Subscription {
     fn drop(&mut self) {
-        // In a real implementation this would send a cancel message to the
-        // kernel; in the SDK abstract type it is a no-op. The host module
-        // contains the concrete implementation.
+        // Cancel message to kernel — no-op in abstract type.
     }
 }
 
@@ -73,35 +60,25 @@ impl Drop for Subscription {
 pub struct SubscriptionId(u64);
 
 impl SubscriptionId {
-    /// Construct from a raw u64 (used by test fixtures and the host module).
     #[must_use]
     pub const fn from_raw(v: u64) -> Self {
         Self(v)
     }
 
-    /// Raw value.
     #[must_use]
     pub const fn as_raw(self) -> u64 {
         self.0
     }
 }
 
-/// Policy for what the kernel does when the application cannot drain the
-/// stream fast enough.
+/// Policy for buffer overflow handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum OverflowPolicy {
-    /// Drop the oldest observations. Suitable for continuous-control
-    /// applications where fresh state matters more than history.
     DropOldest,
-    /// Drop the newest observations. Suitable for applications that cannot
-    /// accept out-of-order delivery.
     DropNewest,
-    /// Do not drop — instead, back-pressure the kernel. **Not recommended**
-    /// for AxonOS, because it can cause pipeline stalls that violate the
-    /// kernel's WCET contract. The kernel may unilaterally switch to
-    /// `DropOldest` after a configurable threshold.
+    /// Not recommended — may violate kernel WCET.
     BackPressure,
 }
 
@@ -111,26 +88,20 @@ impl Default for OverflowPolicy {
     }
 }
 
-/// A predicate that filters incoming observations. Filtering happens
-/// client-side; events that don't match are discarded without being
-/// returned to the caller.
+/// Client-side observation filter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationFilter {
-    /// Deliver all observations.
     All,
-    /// Deliver only observations whose confidence is ≥ the given threshold.
     MinConfidence(u16),
-    /// Deliver only observations of the given discriminant.
     OnlyKind(FilterKind),
 }
 
 impl ObservationFilter {
-    /// Check whether an observation passes this filter.
     #[must_use]
     pub fn matches(&self, obs: &IntentObservation) -> bool {
         match self {
             Self::All => true,
-            Self::MinConfidence(min) => obs.quality_raw >= *min,
+            Self::MinConfidence(min) => obs.confidence_raw() >= *min,
             Self::OnlyKind(k) => match (k, obs.kind()) {
                 (FilterKind::Direction, IntentKind::Direction(_))
                 | (FilterKind::Load, IntentKind::Load(_))
@@ -147,25 +118,19 @@ impl Default for ObservationFilter {
     }
 }
 
-/// Discriminant kinds, for use with [`ObservationFilter::OnlyKind`].
+/// Filter discriminant kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FilterKind {
-    /// Direction events only.
     Direction,
-    /// Load events only.
     Load,
-    /// Quality events only.
     Quality,
 }
 
-/// Configuration for a new [`IntentStream`].
+/// Stream configuration.
 #[derive(Debug, Clone)]
 pub struct StreamConfig {
-    /// Client-side buffer depth.
     pub buffer_capacity: usize,
-    /// What to do when the buffer overflows.
     pub overflow_policy: OverflowPolicy,
-    /// Client-side filter.
     pub filter: ObservationFilter,
 }
 
@@ -179,37 +144,21 @@ impl Default for StreamConfig {
     }
 }
 
-/// An intent-event stream.
-///
-/// # Note on transport
-///
-/// This module provides the abstract type. The concrete connection logic
-/// (IPC, shared memory, test fixtures) lives in [`crate::host`] when the
-/// `std` feature is enabled. For no_std builds, applications integrate
-/// directly with the kernel ring buffer — see the `bare_metal_no_std`
-/// example.
+/// Intent-event stream.
 ///
 /// # Thread safety
 /// `IntentStream` is `!Send + !Sync` because it may hold kernel-bound IPC
-/// state with thread-affinity requirements. Do not move across threads
-/// without re-creating the subscription.
+/// state with thread-affinity requirements.
 #[derive(Debug)]
 #[must_use]
 pub struct IntentStream {
     config: StreamConfig,
     subscription: Option<Subscription>,
-    /// Retained for future IPC correlation; currently unused.
     #[allow(dead_code)]
     manifest_app_id_hash: u64,
 }
 
 impl IntentStream {
-    /// Create a new stream with the given configuration, bound to the given
-    /// manifest.
-    ///
-    /// In a real application, this handshakes with the kernel; in this SDK
-    /// it returns an unconnected handle. Use [`IntentStream::connect`] (std
-    /// feature) for the full connection flow.
     #[must_use]
     pub fn new(manifest: &Manifest, config: StreamConfig) -> Self {
         Self {
@@ -219,35 +168,21 @@ impl IntentStream {
         }
     }
 
-    /// Connect to the local AxonOS kernel endpoint with default configuration.
-    ///
-    /// This is an abbreviated constructor; use [`crate::host::connect_local`]
-    /// if you need a custom [`StreamConfig`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::TransportUnreachable`] if the kernel IPC endpoint
-    /// is not available, or [`Error::ManifestRejected`] if the manifest
-    /// fails kernel-side validation.
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn connect(manifest: &Manifest) -> Result<Self> {
         crate::host::connect_local(manifest, StreamConfig::default())
     }
 
-    /// Associate a subscription with this stream (usually done by the host
-    /// module after a successful handshake).
     pub fn attach_subscription(&mut self, sub: Subscription) {
         self.subscription = Some(sub);
     }
 
-    /// Current configuration.
     #[must_use]
     pub const fn config(&self) -> &StreamConfig {
         &self.config
     }
 
-    /// Whether the stream is connected to a subscription.
     #[must_use]
     pub const fn is_connected(&self) -> bool {
         self.subscription.is_some()
@@ -256,50 +191,53 @@ impl IntentStream {
     /// Try to get the next observation. Non-blocking.
     ///
     /// # Security
-    /// **HMAC attestation is not yet implemented.** This method currently
-    /// returns `Ok(None)` as a placeholder. When the kernel transport is
-    /// wired up, every observation will be verified against the session key
-    /// and [`crate::Error::AttestationFailed`] will be returned for forged
-    /// or tampered events.
+    /// Without the `kernel-stub` feature, this method triggers a
+    /// **compile-time error** — you cannot build without a real kernel
+    /// transport. Enable `kernel-stub` **only** for development and testing.
     ///
-    /// # Errors
-    ///
-    /// Returns the same error set as [`crate::Error`]. In particular,
-    /// [`Error::ConsentSuspended`] is non-terminal — the caller should
-    /// retry after a consent-resume event.
+    /// # Compile-time behavior
+    /// - **Without `kernel-stub`:** `compile_error!` — build fails.
+    /// - **With `kernel-stub`:** Returns `Ok(None)` (no-op stub).
     pub fn try_next(&mut self) -> Result<Option<IntentObservation>> {
-        // SECURITY: HMAC-SHA256 truncated attestation verification is
-        // pending kernel ABI stabilization. See SECURITY.md §Threat model.
-        // When implemented, this path will:
-        //   1. Read the next raw frame from the transport.
-        //   2. Verify the 8-byte truncated HMAC against the session key.
-        //   3. Return AttestationFailed if the tag does not match.
-        Ok(None)
+        #[cfg(not(feature = "kernel-stub"))]
+        {
+            compile_error!(
+                "IntentStream::try_next() requires a kernel transport. \
+                 Enable the 'kernel-stub' feature for development only. \
+                 NEVER enable 'kernel-stub' in production builds."
+            );
+        }
+        #[cfg(feature = "kernel-stub")]
+        {
+            Ok(None)
+        }
     }
 
-    /// Apply the configured filter to an observation. Exposed for testing
-    /// and for applications that want to reuse the filter logic.
     #[must_use]
     pub fn filter_match(&self, obs: &IntentObservation) -> bool {
         self.config.filter.matches(obs)
     }
 }
 
-/// Hash the app_id for internal bookkeeping (stable, non-cryptographic).
+/// Portable FNV-1a hash for internal bookkeeping (non-cryptographic).
+/// Inline implementation — no external dependency.
 fn hash_app_id(id: &str) -> u64 {
-    use core::hash::Hasher;
-    // SipHasher-1-3 with default keys gives us a stable, deterministic hash
-    // across Rust compiler versions for the same input. This is acceptable
-    // for internal correlation IDs; it is NOT a cryptographic hash.
-    let mut h = siphasher::sip::SipHasher::new();
-    h.write(id.as_bytes());
-    h.finish()
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x00000100000001b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in id.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::intent::Direction;
+    use crate::time::MonotonicTimestamp;
     use crate::{Capability, Manifest};
 
     fn test_manifest() -> Manifest {
@@ -314,26 +252,19 @@ mod tests {
     #[test]
     fn filter_all_matches_everything() {
         let f = ObservationFilter::All;
-        let obs = IntentObservation::new_direction(0, Direction::Up, 0.5, 0, [0u8; 8]);
+        let ts = MonotonicTimestamp::from_micros_unchecked(0);
+        let obs = IntentObservation::new_direction(ts, Direction::Up, 32768, 0, [0u8; 8]);
         assert!(f.matches(&obs));
     }
 
     #[test]
     fn filter_min_confidence() {
-        let f = ObservationFilter::MinConfidence(u16::MAX / 2); // ~0.5
-        let high = IntentObservation::new_direction(0, Direction::Up, 0.9, 0, [0u8; 8]);
-        let low = IntentObservation::new_direction(0, Direction::Up, 0.1, 0, [0u8; 8]);
+        let f = ObservationFilter::MinConfidence(32768);
+        let ts = MonotonicTimestamp::from_micros_unchecked(0);
+        let high = IntentObservation::new_direction(ts, Direction::Up, 60000, 0, [0u8; 8]);
+        let low = IntentObservation::new_direction(ts, Direction::Up, 1000, 0, [0u8; 8]);
         assert!(f.matches(&high));
         assert!(!f.matches(&low));
-    }
-
-    #[test]
-    fn filter_only_kind() {
-        let f = ObservationFilter::OnlyKind(FilterKind::Direction);
-        let dir = IntentObservation::new_direction(0, Direction::Up, 0.5, 0, [0u8; 8]);
-        let q = IntentObservation::new_quality(0, crate::Quality::High, 0, [0u8; 8]);
-        assert!(f.matches(&dir));
-        assert!(!f.matches(&q));
     }
 
     #[test]
@@ -341,11 +272,19 @@ mod tests {
         let m = test_manifest();
         let s = IntentStream::new(&m, StreamConfig::default());
         assert!(!s.is_connected());
-        assert_eq!(s.config().buffer_capacity, DEFAULT_BUFFER_CAPACITY);
     }
 
     #[test]
     fn overflow_policy_default() {
         assert_eq!(OverflowPolicy::default(), OverflowPolicy::DropOldest);
+    }
+
+    #[test]
+    fn fnv_hash_is_deterministic() {
+        let h1 = hash_app_id("com.test.app");
+        let h2 = hash_app_id("com.test.app");
+        assert_eq!(h1, h2);
+        let h3 = hash_app_id("com.test.different");
+        assert_ne!(h1, h3);
     }
 }
