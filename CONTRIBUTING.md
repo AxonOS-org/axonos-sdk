@@ -5,7 +5,7 @@ Thank you for your interest in AxonOS. This document describes how to contribute
 ## Before you start
 
 - **Read the Medium research series** at https://medium.com/@AxonOS to understand the project's design philosophy. AxonOS is a safety-critical BCI infrastructure project; contributions are evaluated against that standard.
-- **For protocol changes**, coordinate with the SYM.BOT maintainers of the MMP base protocol at https://sym.bot/spec/mmp. Consent-extension changes must be co-signed.
+- **For protocol changes**, coordinate with the AxonOS maintainers of the AxonOS base protocol at https://axonos.org/spec/acp. Consent protocol changes follow the standard RFC process.
 
 ## Quick start
 

@@ -5,33 +5,31 @@
 //!
 //! # Formal specification
 //!
-//! A capability is a **grant** from the AxonOS kernel to an application,
+//! A capability is a grant from the AxonOS kernel to an application,
 //! authorizing it to receive a specific class of intent observations.
 //!
 //! ## Invariants
-//! - Capabilities are **enumerated** — no custom capabilities exist.
-//! - Capabilities are **immutable** after manifest handshake.
-//! - Capabilities are **non-transferable** — an app cannot delegate
-//!   its `Navigation` capability to another app.
-//! - The kernel **verifies** capabilities against a hardware-backed
-//!   policy store; the SDK merely declares intent.
+//! - Capabilities are enumerated --- no custom capabilities exist.
+//! - Capabilities are immutable after manifest handshake.
+//! - Capabilities are non-transferable.
+//! - The kernel verifies capabilities against a hardware-backed policy
+//!   store; the SDK merely declares intent.
 //!
 //! ## Wire format
 //!
-//! `CapabilitySet` is serialized as a **little-endian u32 bitfield**:
+//! `CapabilitySet` is serialized as a little-endian u32 bitfield:
 //! ```text
 //! bit 0: Navigation
 //! bit 1: WorkloadAdvisory
 //! bit 2: SessionQuality
 //! bit 3: ArtifactEvents
-//! bits 4-31: reserved (must be zero)
+//! bits 4..31: reserved (must be zero)
 //! ```
-//!
 //! Any set reserved bit causes `ManifestRejected::ProhibitedCapability`.
 
 use core::fmt;
 
-/// Application capability. Enumerated — no escape hatch by design.
+/// Application capability. Enumerated --- no escape hatch by design.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
@@ -47,6 +45,11 @@ pub enum Capability {
     ArtifactEvents = 3,
 }
 
+/// Total number of [`Capability`] variants.
+///
+/// Single source of truth for the bitfield-width invariant.
+pub const CAPABILITY_COUNT: u8 = 4;
+
 impl Capability {
     /// Wire-level u8 discriminant.
     #[must_use]
@@ -54,7 +57,7 @@ impl Capability {
         self as u8
     }
 
-    /// Maximum events per second the kernel will deliver.
+    /// Maximum events per second the kernel will deliver for this capability.
     #[must_use]
     pub const fn kernel_rate_limit_hz(self) -> u32 {
         match self {
@@ -75,6 +78,31 @@ impl Capability {
             Self::ArtifactEvents => "artifact_events",
         }
     }
+
+    /// Construct from u8 discriminant.
+    ///
+    /// Returns `None` if the value does not correspond to a known capability,
+    /// preventing the construction of out-of-range values from external input.
+    #[must_use]
+    pub const fn from_u8(v: u8) -> Option<Self> {
+        match v {
+            0 => Some(Self::Navigation),
+            1 => Some(Self::WorkloadAdvisory),
+            2 => Some(Self::SessionQuality),
+            3 => Some(Self::ArtifactEvents),
+            _ => None,
+        }
+    }
+
+    /// Bit position in the [`CapabilitySet`] bitfield.
+    ///
+    /// Centralised so the `with`/`contains` operations share one source of
+    /// truth and the compile-time guard does not need to be duplicated.
+    #[inline]
+    const fn bit(self) -> u32 {
+        // Safe: `as_u8() < CAPABILITY_COUNT < 32` (guard below).
+        1u32.wrapping_shl(self.as_u8() as u32)
+    }
 }
 
 impl fmt::Display for Capability {
@@ -83,16 +111,13 @@ impl fmt::Display for Capability {
     }
 }
 
-// Compile-time guard: largest discriminant must fit in bitfield.
+// Compile-time guard: all variants fit in the u32 bitfield.
+// If a new variant is added past index 31, this fails at build time.
 const _: () = {
-    let max = Capability::ArtifactEvents as u8;
-    assert!((max as usize) < (core::mem::size_of::<u32>() * 8));
+    assert!((CAPABILITY_COUNT as usize) < (core::mem::size_of::<u32>() * 8));
 };
 
 /// Opaque raw representation of a [`CapabilitySet`].
-///
-/// The internal bit layout is not part of the stable public API.
-/// Use this only for logging, metrics, or opaque storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawCapabilitySet(u32);
@@ -104,10 +129,12 @@ impl RawCapabilitySet {
         self.0
     }
 
-    /// Check if any reserved bits are set (invalid wire format).
+    /// True if any reserved bits are set (invalid wire format).
     #[must_use]
     pub const fn has_reserved_bits(self) -> bool {
-        self.0 & !0x0F != 0
+        // Reserved mask: bits 4..31 must be zero.
+        let valid_mask: u32 = (1u32.wrapping_shl(CAPABILITY_COUNT as u32)) - 1;
+        self.0 & !valid_mask != 0
     }
 }
 
@@ -130,16 +157,20 @@ impl CapabilitySet {
     }
 
     /// Add a capability.
+    ///
+    /// Uses `wrapping_shl` for defence-in-depth: even if `CAPABILITY_COUNT`
+    /// is incorrectly raised past 32 without updating the compile-time
+    /// guard, this operation will not invoke undefined behaviour.
     #[must_use]
     pub const fn with(mut self, c: Capability) -> Self {
-        self.0 |= 1u32 << (c.as_u8() as u32);
+        self.0 |= c.bit();
         self
     }
 
     /// Check membership.
     #[must_use]
     pub const fn contains(&self, c: Capability) -> bool {
-        (self.0 & (1u32 << (c.as_u8() as u32))) != 0
+        (self.0 & c.bit()) != 0
     }
 
     /// Count of capabilities in the set.
@@ -154,16 +185,12 @@ impl CapabilitySet {
         self.0 == 0
     }
 
-    /// Iterate over capabilities. Explicitly enumerated for exhaustiveness.
-    pub fn iter(&self) -> impl Iterator<Item = Capability> + '_ {
-        [
-            Capability::Navigation,
-            Capability::WorkloadAdvisory,
-            Capability::SessionQuality,
-            Capability::ArtifactEvents,
-        ]
-        .into_iter()
-        .filter(|c| self.contains(*c))
+    /// Iterate over capabilities in discriminant order.
+    ///
+    /// Zero-cost custom iterator (4-state machine, no array allocation).
+    #[must_use]
+    pub const fn iter(&self) -> CapabilityIter {
+        CapabilityIter { bits: self.0, idx: 0 }
     }
 
     /// Opaque raw representation.
@@ -201,6 +228,55 @@ impl fmt::Display for CapabilitySet {
     }
 }
 
+/// Zero-cost iterator over capabilities in a [`CapabilitySet`].
+///
+/// Yields capabilities in discriminant order (Navigation, WorkloadAdvisory,
+/// SessionQuality, ArtifactEvents).
+#[derive(Debug, Clone)]
+pub struct CapabilityIter {
+    bits: u32,
+    idx: u8,
+}
+
+impl Iterator for CapabilityIter {
+    type Item = Capability;
+
+    fn next(&mut self) -> Option<Capability> {
+        while self.idx < CAPABILITY_COUNT {
+            let bit = 1u32.wrapping_shl(self.idx as u32);
+            let current = self.idx;
+            self.idx += 1;
+            if self.bits & bit != 0 {
+                return Capability::from_u8(current);
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = (self.bits & !((1u32 << self.idx).wrapping_sub(1))).count_ones() as usize;
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for CapabilityIter {}
+
+impl IntoIterator for CapabilitySet {
+    type Item = Capability;
+    type IntoIter = CapabilityIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a CapabilitySet {
+    type Item = Capability;
+    type IntoIter = CapabilityIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +310,15 @@ mod tests {
     }
 
     #[test]
+    fn reserved_bits_detected() {
+        let raw = RawCapabilitySet(0xFF00_0000);
+        assert!(raw.has_reserved_bits());
+
+        let raw_ok = RawCapabilitySet(0x0F);
+        assert!(!raw_ok.has_reserved_bits());
+    }
+
+    #[test]
     fn display_format() {
         let s = CapabilitySet::new()
             .with(Capability::Navigation)
@@ -245,5 +330,54 @@ mod tests {
     fn audit_name_matches_display() {
         assert_eq!(Capability::Navigation.audit_name(), "navigation");
         assert_eq!(format!("{}", Capability::Navigation), "navigation");
+    }
+
+    #[test]
+    fn from_u8_rejects_out_of_range() {
+        assert_eq!(Capability::from_u8(0), Some(Capability::Navigation));
+        assert_eq!(Capability::from_u8(3), Some(Capability::ArtifactEvents));
+        assert_eq!(Capability::from_u8(4), None);
+        assert_eq!(Capability::from_u8(255), None);
+    }
+
+    #[test]
+    fn into_iterator_owned() {
+        let s = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::ArtifactEvents);
+        let collected: heapless::Vec<Capability, 4> = s.into_iter().collect();
+        assert_eq!(collected.len(), 2);
+        assert_eq!(collected[0], Capability::Navigation);
+        assert_eq!(collected[1], Capability::ArtifactEvents);
+    }
+
+    #[test]
+    fn into_iterator_borrowed() {
+        let s = CapabilitySet::new().with(Capability::SessionQuality);
+        let mut count = 0;
+        for c in &s {
+            assert_eq!(c, Capability::SessionQuality);
+            count += 1;
+        }
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn iter_yields_in_discriminant_order() {
+        let s = CapabilitySet::new()
+            .with(Capability::ArtifactEvents)
+            .with(Capability::Navigation);
+        let collected: heapless::Vec<Capability, 4> = s.iter().collect();
+        // Navigation (bit 0) before ArtifactEvents (bit 3)
+        assert_eq!(collected[0], Capability::Navigation);
+        assert_eq!(collected[1], Capability::ArtifactEvents);
+    }
+
+    #[test]
+    fn iter_exact_size() {
+        let s = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::SessionQuality);
+        assert_eq!(s.iter().len(), 2);
     }
 }

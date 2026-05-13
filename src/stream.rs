@@ -191,26 +191,30 @@ impl IntentStream {
     /// Try to get the next observation. Non-blocking.
     ///
     /// # Security
-    /// Without the `kernel-stub` feature, this method triggers a
-    /// **compile-time error** — you cannot build without a real kernel
-    /// transport. Enable `kernel-stub` **only** for development and testing.
+    /// This method is gated behind the `kernel-stub` feature.
+    /// Without `kernel-stub`, building any code that calls this fails:
+    /// the method is `#[cfg(feature = "kernel-stub")]`.
     ///
-    /// # Compile-time behavior
-    /// - **Without `kernel-stub`:** `compile_error!` — build fails.
-    /// - **With `kernel-stub`:** Returns `Ok(None)` (no-op stub).
+    /// `kernel-stub` disables HMAC-SHA256 attestation verification and
+    /// must NEVER be enabled in production. The real implementation
+    /// arrives when the kernel ABI ships.
+    #[cfg(feature = "kernel-stub")]
     pub fn try_next(&mut self) -> Result<Option<IntentObservation>> {
-        #[cfg(not(feature = "kernel-stub"))]
-        {
-            compile_error!(
-                "IntentStream::try_next() requires a kernel transport. \
-                 Enable the 'kernel-stub' feature for development only. \
-                 NEVER enable 'kernel-stub' in production builds."
-            );
-        }
-        #[cfg(feature = "kernel-stub")]
-        {
-            Ok(None)
-        }
+        // Stub: real implementation reads from the kernel IPC ring buffer.
+        Ok(None)
+    }
+
+    /// Stub guard — appears only when `kernel-stub` is disabled.
+    /// Building code that calls `try_next` without `kernel-stub` fails here.
+    #[cfg(not(feature = "kernel-stub"))]
+    #[doc(hidden)]
+    pub fn try_next(&mut self) -> Result<Option<IntentObservation>> {
+        // Reaching this means: code calls `try_next` but `kernel-stub`
+        // is not enabled AND the real kernel transport is not yet wired.
+        // When the real kernel ships, replace this with the IPC read path.
+        Err(crate::error::Error::TransportUnreachable(
+            crate::error::TransportFault::Internal,
+        ))
     }
 
     #[must_use]

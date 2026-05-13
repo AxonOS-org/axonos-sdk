@@ -20,8 +20,8 @@ struct Cursor { x: f32, y: f32 }
 
 impl Cursor {
     fn apply(&mut self, dx: f32, dy: f32) {
-        self.x = SMOOTHING.mul_add(dx, (1.0 - SMOOTHING) * self.x);
-        self.y = SMOOTHING.mul_add(dy, (1.0 - SMOOTHING) * self.y);
+        self.x = SMOOTHING * dx + (1.0 - SMOOTHING) * self.x;
+        self.y = SMOOTHING * dy + (1.0 - SMOOTHING) * self.y;
     }
 }
 
@@ -37,8 +37,8 @@ fn direction_vector(d: Direction) -> (f32, f32) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = Manifest::builder()
-        .app_id("com.axonos.example.cursor")
-        .name("Mind Cursor")
+        .app_id("com.axonos.example.cursor")?
+        .name("Mind Cursor")?
         .capability(Capability::Navigation)
         .capability(Capability::SessionQuality)
         .max_rate_hz(50)

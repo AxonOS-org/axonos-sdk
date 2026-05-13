@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-//! Mesh coupling: demonstrate consent withdrawal (MMP §3.1).
+//! Mesh coupling: demonstrate consent withdrawal (ACP §3.1).
 //!
 //! ```sh
 //! cargo run --example mesh_coupling --features "std serde kernel-stub"

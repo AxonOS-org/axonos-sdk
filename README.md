@@ -10,7 +10,7 @@
 
 **Hardened SDK for the AxonOS cognitive operating system.**
 
-Typed intent events, capability manifests, and MMP consent integration for brain-computer interface applications.
+Typed intent events, capability manifests, and AxonOS consent integration for brain-computer interface applications.
 
 > **Version 0.3.0** — production-hardened pre-release. See [readiness checklist](#pre-release-readiness).
 

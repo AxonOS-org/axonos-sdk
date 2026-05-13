@@ -142,6 +142,10 @@ pub enum TransportFault {
     ConnectionRefused,
     Disconnected,
     Timeout,
+    /// Internal state corruption (e.g., poisoned mutex).
+    /// The SDK refuses to proceed when its synchronisation primitives
+    /// are in an indeterminate state.
+    Internal,
 }
 
 /// Manifest rejection reasons.

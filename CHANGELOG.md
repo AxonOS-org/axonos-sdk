@@ -1,59 +1,99 @@
 # Changelog
 
-All notable changes to `axonos-sdk` will be documented in this file.
+All notable changes to `axonos-sdk` are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+---
 
-## [0.1.1] — 2026-04-25
+## [0.4.0] — 2026-05-13
 
-Maintenance release. No public API changes; downstream code does not need
-modification (apart from bumping the minimum Rust toolchain).
+### Breaking changes (security audit)
 
-### Fixed
+- **`ManifestBuilder` setters return `Result<Self, Error>` instead of panicking.**
+  `assert!` on input length has been replaced with `Err(ManifestRejected::Malformed)`.
+  In `panic = "abort"` builds, a malformed app_id no longer terminates the process.
 
-- **Build with `--features serde` no longer fails.** `Capability`, `CapabilitySet`, and `PeerId` now derive `Serialize`/`Deserialize` under the `serde` feature, and the feature now activates `heapless/serde` and `siphasher/serde` so transitive bounds resolve.
-- **Build with `RUSTFLAGS=-D warnings` is now clean.** Removed unused `Error` import in `stream.rs` (was only referenced from doc comments). Gated `core::fmt` import in `error.rs` under the `#[cfg(not(feature = "std"))]` block where it is actually used.
-- **`FrameTooLarge` error variant** now documents its `size` and `max` fields.
-- **Removed dead `dep_alloc` feature** that was a placeholder activating nothing. The `std` feature now directly implies `alloc`.
-- **Removed dead `extern crate alloc;`** — no source file referenced any `alloc::*` types, so the declaration was unused.
+- **`MonotonicTimestamp::elapsed_since` returns `Option<u64>` instead of `u64`.**
+  Silent return of 0 on clock violation could mask kernel bugs in release builds.
+  Use [`elapsed_since_saturating`](MonotonicTimestamp::elapsed_since_saturating)
+  if a clamped value is genuinely desired.
 
-### Changed
+- **`MonotonicTimestamp::Deserialize` validates input.**
+  Values exceeding `SESSION_MAX_REASONABLE_US` (2^48 µs ≈ 8.9 years) are rejected.
+  Prevents adversarial network input from corrupting downstream WCET arithmetic.
 
-- **MSRV bumped from 1.75 to 1.85.** Required because the modern `proptest` and `criterion` dev-dependencies pull in transitive crates that require `edition2024` (stabilised in Rust 1.85). Library users on stable Rust are unaffected; only contributors running the test suite need 1.85+.
-- Cargo profile and feature-flag comments expanded for clarity. Profile rationale (especially `debug = true` on release for embedded probe-rs symbols) now references RFC-0003.
+- **`InMemoryFixture::install`, `uninstall` return `Result<()>`.**
+  Poisoned mutex now surfaces as `TransportFault::Internal` rather than
+  silent recovery via `into_inner()`.
 
-### Maintenance
+- **`CapabilitySet::with` uses `wrapping_shl` for defence-in-depth.**
+  Even if `CAPABILITY_COUNT` is incorrectly raised past 32 in future,
+  no undefined behaviour occurs.
 
-- All five feature combinations (`default`, `std`, `alloc`, `serde`, `zerocopy`, and their union) verified to build cleanly under `RUSTFLAGS=-D warnings` on the local toolchain matching the CI configuration.
-
-## [0.1.0] — 2026-04-19
-
-Initial public release.
+- **`IntentStream::try_next` gated by `#[cfg(feature = "kernel-stub")]`.**
+  Replaces the previous in-body `compile_error!` hack with proper cfg gating.
+  Calling code without the feature now produces a cleaner build error.
 
 ### Added
 
-- Core types: `IntentObservation` (32-byte, `Copy`, `#[repr(C)]`), `IntentKind`, `Direction`, `Load`, `Quality`.
-- Capability model: `Capability` enum, `CapabilitySet` bitfield, per-capability kernel rate limits.
-- Manifest builder with local validation (`app_id` length, rate vs kernel limits).
-- Stream API: `IntentStream`, `StreamConfig`, `ObservationFilter`, `OverflowPolicy`, `Subscription`.
-- Mesh integration: `MeshClient`, `ConsentScope`, `PeerId`, `WithdrawReason` — facade over the MMP Consent Extension v0.1.0.
-- Error taxonomy: four-layer (L1 transport / L2 capability / L3 consent / L4 protocol) with stable `ErrorCode` wire codes and `is_terminal()` classifier.
-- Host integration (`std` feature): `connect_local`, `InMemoryFixture` test harness, `AXONOS_ENDPOINT` env override.
-- Five runnable examples: `hello_intent`, `mind_cursor`, `focus_monitor`, `mesh_coupling`, `bare_metal_no_std`.
-- Integration test suite + Criterion benchmarks.
-- `#![forbid(unsafe_code)]` at the crate root.
-- `#![warn(missing_docs)]` and `#![warn(clippy::pedantic)]` CI-enforced.
-- No-std build verified on `thumbv7em-none-eabihf` and `thumbv8m.main-none-eabihf`.
-- Compile-time assertion: `IntentObservation` is exactly 32 bytes.
-- Dual license: Apache-2.0 OR MIT.
+- `MonotonicTimestamp::from_micros_validated(us)` — validated constructor.
+- `MonotonicTimestamp::elapsed_since_saturating(earlier)` — explicit saturating
+  variant for cases where 0-on-violation is the intended response.
+- `Capability::from_u8(v)` — fallible discriminant constructor.
+- `Capability::bit()` — centralised bit-position helper.
+- `CapabilityIter` — zero-cost custom iterator (4-state machine, no array allocation).
+- `impl IntoIterator for CapabilitySet` and `impl IntoIterator for &CapabilitySet`.
+- `TransportFault::Internal` — variant for poisoned mutex / corrupted state.
 
-### Compatibility
+### Changed
 
-- MMP Consent Extension version targeted: **0.1.0**.
-- AxonOS kernel ABI version: **1**.
-- Minimum supported Rust version (MSRV): **1.85.0**.
+- `host::resolve_endpoint` returns `Cow<'static, str>` (avoids allocation for default).
+- `zerocopy_ext` is now `pub(crate)` (reduced public surface).
+- `examples/mind_cursor.rs` no longer uses `f32::mul_add` (FPU-only on bare-metal).
 
-[Unreleased]: https://github.com/AxonOS-org/axonos-sdk/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/AxonOS-org/axonos-sdk/releases/tag/v0.1.0
+### Removed
+
+- All references to the previous external protocol coupling.
+  AxonOS Consent Protocol (ACP) is the sole consent specification.
+
+### Migration guide
+
+```diff
+- let m = Manifest::builder()
+-     .app_id("com.example.app")
+-     .capability(Capability::Navigation)
+-     .build()?;
++ let m = Manifest::builder()
++     .app_id("com.example.app")?
++     .capability(Capability::Navigation)
++     .max_rate_hz(10)
++     .build()?;
+
+- let elapsed: u64 = t2.elapsed_since(t1);
++ let elapsed: u64 = t2.elapsed_since(t1)
++     .ok_or(Error::ClockViolation)?;
++ // Or, if 0-on-violation is the intended response:
++ let elapsed: u64 = t2.elapsed_since_saturating(t1);
+
+- fx.install();
++ fx.install()?;
+```
+
+---
+
+## [0.3.0] — 2026-04-22
+
+- Production-hardened SDK release.
+- `#![deny(unsafe_code)]` enforced.
+- `compile_error!` on unimplemented security paths.
+- `MeshClientStub` renamed to clarify stub status.
+- WCET documentation for `MonotonicTimestamp` operations.
+
+---
+
+## [0.2.0] — 2026-04-15
+
+- Initial public release.
+- Capability declarations, typed intent events, consent integration.

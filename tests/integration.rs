@@ -11,7 +11,7 @@ use axonos_sdk::{
 
 fn test_manifest(app: &str) -> Manifest {
     Manifest::builder()
-        .app_id(app)
+        .app_id(app)?
         .capability(Capability::Navigation)
         .capability(Capability::SessionQuality)
         .max_rate_hz(10)
@@ -44,7 +44,7 @@ fn connect_without_fixture_fails_with_transport_error() {
 #[test]
 fn manifest_rejects_rate_over_kernel_limit() {
     let r = Manifest::builder()
-        .app_id("com.test.e2e.3")
+        .app_id("com.test.e2e.3")?
         .capability(Capability::WorkloadAdvisory)
         .max_rate_hz(100)
         .build();
@@ -60,7 +60,7 @@ fn manifest_rejects_rate_over_kernel_limit() {
 #[test]
 fn manifest_rejects_zero_rate() {
     let r = Manifest::builder()
-        .app_id("com.test.e2e.zero")
+        .app_id("com.test.e2e.zero")?
         .capability(Capability::Navigation)
         .max_rate_hz(0)
         .build();
@@ -137,7 +137,7 @@ fn observation_align_is_8() {
 
 #[test]
 fn version_constants_surface_correctly() {
-    assert_eq!(axonos_sdk::MMP_CONSENT_VERSION, "0.1.0");
+    assert_eq!(axonos_sdk::CONSENT_PROTOCOL_VERSION, "0.2.0");
     assert!(axonos_sdk::KERNEL_ABI_VERSION >= 1);
     assert!(!axonos_sdk::VERSION.is_empty());
 }
@@ -145,9 +145,9 @@ fn version_constants_surface_correctly() {
 #[test]
 fn manifest_builder_is_infallible_intermediate() {
     let _builder = Manifest::builder()
-        .app_id("com.test.builder")
-        .name("Test")
-        .vendor("AxonOS")
+        .app_id("com.test.builder")?
+        .name("Test")?
+        .vendor("AxonOS")?
         .capability(Capability::Navigation)
         .max_rate_hz(10);
     assert!(_builder.build().is_ok());

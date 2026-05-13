@@ -48,7 +48,7 @@ This release addresses all Critical and High severity findings from independent 
   - Empty placeholder with safety contract documentation.
 
 - **`serde_repr` on `WithdrawReason`** (`src/mesh.rs`)
-  - Numeric `u8` wire format per MMP spec.
+  - Numeric `u8` wire format per AxonOS Consent Protocol spec.
 
 ### Low
 

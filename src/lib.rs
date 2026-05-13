@@ -78,7 +78,7 @@ pub mod host;
 // All unsafe code in this crate MUST live in this module.
 #[cfg(feature = "zerocopy")]
 #[allow(unsafe_code)]
-pub mod zerocopy_ext;
+pub(crate) mod zerocopy_ext;
 
 pub use capability::{Capability, CapabilitySet, RawCapabilitySet};
 pub use error::{Error, Result};
@@ -93,8 +93,8 @@ pub use time::MonotonicTimestamp;
 /// Crate version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// MMP Consent Extension version.
-pub const MMP_CONSENT_VERSION: &str = "0.1.0";
+/// AxonOS Consent Protocol version.
+pub const CONSENT_PROTOCOL_VERSION: &str = "0.2.0";
 
 /// Kernel ABI version.
 pub const KERNEL_ABI_VERSION: u32 = 1;
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn version_constants() {
         assert!(!VERSION.is_empty());
-        assert!(!MMP_CONSENT_VERSION.is_empty());
+        assert!(!CONSENT_PROTOCOL_VERSION.is_empty());
         assert!(KERNEL_ABI_VERSION >= 1);
     }
 

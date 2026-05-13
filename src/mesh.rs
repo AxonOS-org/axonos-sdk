@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 
-//! Mesh integration — MMP Consent Extension client facade.
+//! Mesh integration — AxonOS Consent Protocol client facade.
 //!
 //! # ⚠️ Stub status
 //!
@@ -42,7 +42,7 @@ pub enum ConsentScope {
     All,
 }
 
-/// Withdraw reason per MMP Consent Extension §3.4.
+/// Withdraw reason per AxonOS Consent Protocol §3.4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
 #[repr(u8)]
@@ -53,7 +53,7 @@ pub enum WithdrawReason {
     HardwareFault = 0x03,
 }
 
-/// **Stub** implementation of the MMP mesh consent client.
+/// **Stub** implementation of the AxonOS mesh consent client.
 ///
 /// # Warning
 /// This is **not a real client**. All methods are no-ops until the

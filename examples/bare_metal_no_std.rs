@@ -18,7 +18,7 @@ fn main() {
 
 fn demo() {
     let manifest = Manifest::builder()
-        .app_id("embedded.demo")
+        .app_id("embedded.demo")?
         .capability(Capability::Navigation)
         .max_rate_hz(10)
         .build()

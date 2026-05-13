@@ -12,9 +12,9 @@ use axonos_sdk::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = Manifest::builder()
-        .app_id("com.axonos.example.hello")
-        .name("Hello Intent")
-        .vendor("AxonOS")
+        .app_id("com.axonos.example.hello")?
+        .name("Hello Intent")?
+        .vendor("AxonOS")?
         .capability(Capability::Navigation)
         .max_rate_hz(10)
         .build()?;
