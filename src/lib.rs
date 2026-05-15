@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 Denis Yermakou / AxonOS
 //
-// Release 0.3.0 — Production-Hardened BCI SDK
+// Release 0.4.0 — Security-Audit-Hardened BCI SDK
 //   - compile_error! on unimplemented security paths (no runtime surprises)
 //   - Mutex poison recovery (no panic in sync primitives)
 //   - Explicit stub naming (MeshClientStub)

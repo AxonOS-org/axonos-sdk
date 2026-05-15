@@ -12,7 +12,7 @@
 
 Typed intent events, capability manifests, and AxonOS consent integration for brain-computer interface applications.
 
-> **Version 0.3.0** — production-hardened pre-release. See [readiness checklist](#pre-release-readiness).
+> **Version 0.4.0** — security-audit-hardened. See [security audit fixes](#v040-security-audit-may-2026) and [readiness checklist](#pre-release-readiness).
 
 ---
 
@@ -141,25 +141,54 @@ Dual-licensed under Apache-2.0 or MIT. Every source file carries an SPDX identif
 
 ## Pre-release readiness
 
-**Shipped in 0.3.0:**
-- `IntentObservation` (32-byte, `#[repr(C, align(8))]`), fixed-point Q0.16
-- `MonotonicTimestamp` with WCET documentation
-- `CapabilitySet` u32 bitfield + formal wire spec + audit formatting
-- `ManifestBuilder` with infallible intermediates, no silent truncation
-- `IntentStream` with `compile_error!` security boundary
-- `MeshClientStub` — explicitly marked, not fake
-- Mutex poison recovery (no panic)
-- `#![deny(unsafe_code)]` with audited `zerocopy_ext` module
+## v0.4.0 security audit (May 2026)
+
+Fourteen items resolved across four severity levels. Highlights:
+
+**P0 (Critical) — public API hardening:**
+- `ManifestBuilder` setters return `Result<Self, Error>` — no `assert!` panics on malformed input
+- `MonotonicTimestamp::elapsed_since` returns `Option<u64>` — no silent 0 on clock violation
+- `MonotonicTimestamp::Deserialize` rejects values exceeding `SESSION_MAX_REASONABLE_US`
+
+**P1 (High) — defence in depth:**
+- `wrapping_shl` in `CapabilitySet::with` for compile-time-guard resilience
+- Compile-time assertions on `IntentObservation` layout (size=32, align=8) matching RFC-0006
+- `InMemoryFixture` poisoned-mutex paths return `TransportFault::Internal`, no silent recovery
+
+**P2 (Medium) — performance and ergonomics:**
+- Zero-cost custom `CapabilityIter` (no fat-iterator overhead)
+- `resolve_endpoint()` returns `Cow<'static, str>` — no allocation on default
+- `mind_cursor.rs` example no longer uses `f32::mul_add` (soft-float target compatibility)
+
+**P3 (Low) — surface area:**
+- `zerocopy_ext` is `pub(crate)`
+- `try_next` uses `#[cfg(feature = "kernel-stub")]` on the function (not `compile_error!` in body)
+- `IntoIterator` for `CapabilitySet` and `&CapabilitySet`
+
+See [RELEASE_NOTES.md](./RELEASE_NOTES.md) and [CHANGELOG.md](./CHANGELOG.md)
+for migration guide.
+
+## Pre-release readiness
+
+**Shipped in 0.4.0:**
+- `IntentObservation` (32-byte, `#[repr(C, align(8))]`), fixed-point Q0.16 — matches RFC-0006 wire format
+- `MonotonicTimestamp` with WCET documentation and validated deserialization
+- `CapabilitySet` u32 bitfield + formal wire spec + audit formatting + custom iterator + `IntoIterator`
+- `ManifestBuilder` with `Result<Self, Error>` setters, no silent truncation, no panics on bad input
+- `IntentStream` with feature-gated `try_next`
+- `MeshClientStub` — explicitly marked, not a working client
+- Explicit error on poisoned mutex (no silent `into_inner()` recovery)
+- `#![deny(unsafe_code)]` with audited, `pub(crate)` `zerocopy_ext` module
 - 5 examples, integration tests, Criterion benchmarks
 
 **Pending before 1.0:**
 - Real IPC transport in `host.rs`
-- HMAC-SHA256 attestation verification
-- `axonos-consent` wire integration
-- Kernel ABI stabilization
+- HMAC-SHA256 attestation verification against `axonos-consent` consent channel
+- Kernel ABI stabilization (RFC-0006 Candidate → Stable, Q2 2026 per RFC-0005)
+- L3 oscilloscope-validated WCRT (Q2 2026)
 
-**Practical meaning:** types and API are production-quality. Runtime I/O is placeholder until AxonOS kernel ships. Build against this SDK today; run against real kernel when available.
+**Practical meaning:** types and API are security-audit-hardened. Runtime I/O is placeholder until the AxonOS kernel ships. Build against this SDK today; run against the real kernel when it lands.
 
 ---
 
-axonos.org · [medium.com/@AxonOS](https://medium.com/@AxonOS) · info@axonos.org
+axonos.org · [medium.com/@AxonOS](https://medium.com/@AxonOS) · axonosorg@gmail.com

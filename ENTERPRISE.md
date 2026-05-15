@@ -33,7 +33,7 @@ Not included: code written for you, custom capability registration, on-site supp
 
 Everything in Foundation, plus:
 
-- **Interop vector verification.** We run your CBOR- or JSON-side consent implementation against the AxonOS conformance suite (15 canonical vectors as of v0.1.0, expanding over time) and return a PASS/FAIL report with byte-level diffs. Up to 4 runs per year, turnaround under 5 business days.
+- **Interop vector verification.** We run your CBOR- or JSON-side consent implementation against the AxonOS conformance suite (15+ canonical vectors per the conformance suite) and return a PASS/FAIL report with byte-level diffs. Up to 4 runs per year, turnaround under 5 business days.
 - **Custom reason code namespace.** Register 4 bytes in the `0x10–0xFF` implementation-specific range of the AxonOS Consent Protocol reason code registry (§3.4), reserved for your organization, with published mapping in the AxonOS documentation.
 - **Quarterly review call.** 60-minute technical call with the AxonOS maintainer covering your integration status, upcoming AxonOS roadmap items, and any architecture questions.
 - **Named responder SLA.** Issues tagged `enterprise/<your-org>` receive four-business-hour first response.
