@@ -14,7 +14,7 @@ This policy applies to:
 
 **Do not file public GitHub issues for security reports.**
 
-Email: `axonosorg@gmail.com`
+Email: `info@axonos.org`
 Subject line: `Security: axonos-sdk <one-line summary>`
 
 Please include:
@@ -58,4 +58,4 @@ Reports describing violations of these properties are treated as critical.
 
 ---
 
-`axonos.org · medium.com/@AxonOS · axonosorg@gmail.com`
+`axonos.org · medium.com/@AxonOS · info@axonos.org`

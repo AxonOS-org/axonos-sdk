@@ -78,8 +78,8 @@ Be kind. Be technically honest. Disagree on merit, not identity. The project res
 ## Questions
 
 General questions → GitHub Discussions or the Medium comment threads.
-Commercial/enterprise questions → `axonosorg@gmail.com`.
+Commercial/enterprise questions → `info@axonos.org`.
 
 ---
 
-`axonos.org · medium.com/@AxonOS · axonosorg@gmail.com`
+`axonos.org · medium.com/@AxonOS · info@axonos.org`

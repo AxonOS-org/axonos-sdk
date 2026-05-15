@@ -191,4 +191,4 @@ for migration guide.
 
 ---
 
-axonos.org · [medium.com/@AxonOS](https://medium.com/@AxonOS) · axonosorg@gmail.com
+axonos.org · [medium.com/@AxonOS](https://medium.com/@AxonOS) · info@axonos.org
