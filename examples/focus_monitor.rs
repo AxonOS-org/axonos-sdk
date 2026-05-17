@@ -21,9 +21,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut fx = InMemoryFixture::new();
     let ts = MonotonicTimestamp::from_micros_unchecked;
-    for (i, load) in [Load::Low, Load::Moderate, Load::Moderate, Load::High, Load::Moderate]
-        .iter()
-        .enumerate()
+    for (i, load) in [
+        Load::Low,
+        Load::Moderate,
+        Load::Moderate,
+        Load::High,
+        Load::Moderate,
+    ]
+    .iter()
+    .enumerate()
     {
         #[allow(clippy::cast_possible_truncation)]
         fx.push(IntentObservation::new_load(

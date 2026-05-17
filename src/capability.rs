@@ -191,7 +191,10 @@ impl CapabilitySet {
     /// Zero-cost custom iterator (4-state machine, no array allocation).
     #[must_use]
     pub const fn iter(&self) -> CapabilityIter {
-        CapabilityIter { bits: self.0, idx: 0 }
+        CapabilityIter {
+            bits: self.0,
+            idx: 0,
+        }
     }
 
     /// Opaque raw representation.

@@ -51,7 +51,9 @@ pub fn connect_local(manifest: &Manifest, config: StreamConfig) -> Result<Intent
     // No TOCTOU: we do not probe the endpoint. Real IPC will be wired
     // when the kernel ships.
     if !fixture_installed()? {
-        return Err(Error::TransportUnreachable(TransportFault::EndpointNotFound));
+        return Err(Error::TransportUnreachable(
+            TransportFault::EndpointNotFound,
+        ));
     }
 
     let mut stream = IntentStream::new(manifest, config);
@@ -184,7 +186,9 @@ mod tests {
         let r = connect_local(&m, StreamConfig::default());
         assert!(matches!(
             r,
-            Err(Error::TransportUnreachable(TransportFault::EndpointNotFound))
+            Err(Error::TransportUnreachable(
+                TransportFault::EndpointNotFound
+            ))
         ));
     }
 

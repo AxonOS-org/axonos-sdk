@@ -156,9 +156,8 @@ impl<'de> serde::Deserialize<'de> for MonotonicTimestamp {
         D: serde::Deserializer<'de>,
     {
         let us = u64::deserialize(deserializer)?;
-        Self::from_micros_validated(us).ok_or_else(|| {
-            serde::de::Error::custom("timestamp exceeds SESSION_MAX_REASONABLE_US")
-        })
+        Self::from_micros_validated(us)
+            .ok_or_else(|| serde::de::Error::custom("timestamp exceeds SESSION_MAX_REASONABLE_US"))
     }
 }
 
@@ -211,8 +210,7 @@ mod tests {
         // Bincode → u64 → MonotonicTimestamp roundtrip with oversized value
         let oversized: u64 = SESSION_MAX_REASONABLE_US + 1;
         let bytes = oversized.to_le_bytes();
-        let result: core::result::Result<MonotonicTimestamp, _> =
-            bincode::deserialize(&bytes);
+        let result: core::result::Result<MonotonicTimestamp, _> = bincode::deserialize(&bytes);
         assert!(result.is_err());
     }
 }

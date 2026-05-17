@@ -171,9 +171,8 @@ impl IntentObservation {
     #[must_use]
     pub fn kind(&self) -> IntentKind {
         match self.kind_tag {
-            KindTag::DIRECTION => {
-                Direction::from_u8(self.payload[0]).map_or(IntentKind::Unknown, IntentKind::Direction)
-            }
+            KindTag::DIRECTION => Direction::from_u8(self.payload[0])
+                .map_or(IntentKind::Unknown, IntentKind::Direction),
             KindTag::LOAD => {
                 Load::from_u8(self.payload[0]).map_or(IntentKind::Unknown, IntentKind::Load)
             }
@@ -219,8 +218,8 @@ impl<'de> serde::Deserialize<'de> for IntentObservation {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::{self, MapAccess, Visitor};
         use core::fmt;
+        use serde::de::{self, MapAccess, Visitor};
 
         struct ObsVisitor;
 
@@ -248,44 +247,63 @@ impl<'de> serde::Deserialize<'de> for IntentObservation {
                         "confidence_raw" => confidence_raw = Some(map.next_value()?),
                         "session_id" => session_id = Some(map.next_value()?),
                         "attestation" => attestation = Some(map.next_value()?),
-                        _ => { let _ = map.next_value::<de::IgnoredAny>()?; }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
                     }
                 }
 
-                let timestamp_us = timestamp_us.ok_or_else(|| de::Error::missing_field("timestamp_us"))?;
+                let timestamp_us =
+                    timestamp_us.ok_or_else(|| de::Error::missing_field("timestamp_us"))?;
                 let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
                 let confidence_raw = confidence_raw.unwrap_or(u16::MAX);
-                let session_id = session_id.ok_or_else(|| de::Error::missing_field("session_id"))?;
-                let attestation = attestation.ok_or_else(|| de::Error::missing_field("attestation"))?;
+                let session_id =
+                    session_id.ok_or_else(|| de::Error::missing_field("session_id"))?;
+                let attestation =
+                    attestation.ok_or_else(|| de::Error::missing_field("attestation"))?;
 
                 let obs = match kind {
-                    IntentKind::Direction(d) => {
-                        IntentObservation::new_direction(
-                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
-                            d, confidence_raw, session_id, attestation
-                        )
-                    }
-                    IntentKind::Load(l) => {
-                        IntentObservation::new_load(
-                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
-                            l, confidence_raw, session_id, attestation
-                        )
-                    }
-                    IntentKind::Quality(q) => {
-                        IntentObservation::new_quality(
-                            MonotonicTimestamp::from_micros_unchecked(timestamp_us),
-                            q, session_id, attestation
-                        )
-                    }
+                    IntentKind::Direction(d) => IntentObservation::new_direction(
+                        MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                        d,
+                        confidence_raw,
+                        session_id,
+                        attestation,
+                    ),
+                    IntentKind::Load(l) => IntentObservation::new_load(
+                        MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                        l,
+                        confidence_raw,
+                        session_id,
+                        attestation,
+                    ),
+                    IntentKind::Quality(q) => IntentObservation::new_quality(
+                        MonotonicTimestamp::from_micros_unchecked(timestamp_us),
+                        q,
+                        session_id,
+                        attestation,
+                    ),
                     IntentKind::Unknown => {
-                        return Err(de::Error::custom("cannot deserialize Unknown into concrete observation"));
+                        return Err(de::Error::custom(
+                            "cannot deserialize Unknown into concrete observation",
+                        ));
                     }
                 };
                 Ok(obs)
             }
         }
 
-        d.deserialize_struct("IntentObservation", &["timestamp_us", "kind", "confidence_raw", "session_id", "attestation"], ObsVisitor)
+        d.deserialize_struct(
+            "IntentObservation",
+            &[
+                "timestamp_us",
+                "kind",
+                "confidence_raw",
+                "session_id",
+                "attestation",
+            ],
+            ObsVisitor,
+        )
     }
 }
 
@@ -396,7 +414,13 @@ mod tests {
 
     #[test]
     fn direction_round_trip() {
-        for d in [Direction::Up, Direction::Right, Direction::Down, Direction::Left, Direction::Neutral] {
+        for d in [
+            Direction::Up,
+            Direction::Right,
+            Direction::Down,
+            Direction::Left,
+            Direction::Neutral,
+        ] {
             let ts = MonotonicTimestamp::from_micros_unchecked(0);
             let obs = IntentObservation::new_direction(ts, d, 32768, 0, [0u8; 8]);
             assert_eq!(obs.kind(), IntentKind::Direction(d));

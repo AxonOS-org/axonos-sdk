@@ -25,7 +25,10 @@ pub enum Error {
     #[cfg_attr(feature = "std", error("kernel transport unreachable: {0:?}"))]
     TransportUnreachable(TransportFault),
 
-    #[cfg_attr(feature = "std", error("kernel ABI mismatch: sdk={sdk}, kernel={kernel}"))]
+    #[cfg_attr(
+        feature = "std",
+        error("kernel ABI mismatch: sdk={sdk}, kernel={kernel}")
+    )]
     AbiMismatch { sdk: u32, kernel: u32 },
 
     // L2 — Capability/quota
@@ -35,7 +38,10 @@ pub enum Error {
     #[cfg_attr(feature = "std", error("manifest rejected: {reason:?}"))]
     ManifestRejected { reason: ManifestRejection },
 
-    #[cfg_attr(feature = "std", error("rate limit exceeded: declared={max_rate_hz} Hz"))]
+    #[cfg_attr(
+        feature = "std",
+        error("rate limit exceeded: declared={max_rate_hz} Hz")
+    )]
     RateLimitExceeded { max_rate_hz: u32 },
 
     // L3 — Consent
@@ -52,7 +58,10 @@ pub enum Error {
     #[cfg_attr(feature = "std", error("attestation verification failed"))]
     AttestationFailed,
 
-    #[cfg_attr(feature = "std", error("stream buffer overflow: {dropped} observations dropped"))]
+    #[cfg_attr(
+        feature = "std",
+        error("stream buffer overflow: {dropped} observations dropped")
+    )]
     StreamOverflow { dropped: u32 },
 
     // Other

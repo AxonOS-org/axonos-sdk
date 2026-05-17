@@ -45,7 +45,10 @@ pub enum ConsentScope {
 
 /// Withdraw reason per AxonOS Consent Protocol §3.4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr)
+)]
 #[repr(u8)]
 pub enum WithdrawReason {
     Unspecified = 0x00,

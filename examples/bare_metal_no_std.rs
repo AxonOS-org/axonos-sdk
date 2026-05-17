@@ -38,5 +38,8 @@ fn demo() {
     println!(" IntentObservation: {} bytes", core::mem::size_of_val(&obs));
     println!(" Manifest: {} bytes", core::mem::size_of_val(&manifest));
     println!(" CapabilitySet: {} bytes", core::mem::size_of_val(&caps));
-    println!(" MonotonicTimestamp: {} bytes", core::mem::size_of::<MonotonicTimestamp>());
+    println!(
+        " MonotonicTimestamp: {} bytes",
+        core::mem::size_of::<MonotonicTimestamp>()
+    );
 }

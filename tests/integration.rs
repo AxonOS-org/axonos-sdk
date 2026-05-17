@@ -23,7 +23,13 @@ fn test_manifest(app: &str) -> Manifest {
 fn connect_with_fixture_and_manifest_succeeds() {
     let mut fx = InMemoryFixture::new();
     let ts = MonotonicTimestamp::from_micros_unchecked;
-    fx.push(IntentObservation::new_direction(ts(100), Direction::Up, 58982, 1, [0; 8]));
+    fx.push(IntentObservation::new_direction(
+        ts(100),
+        Direction::Up,
+        58982,
+        1,
+        [0; 8],
+    ));
     fx.install();
 
     let manifest = test_manifest("com.test.e2e.1");
@@ -70,11 +76,22 @@ fn manifest_rejects_zero_rate() {
 #[test]
 fn observation_kind_round_trips_for_all_variants() {
     let ts = MonotonicTimestamp::from_micros_unchecked(0);
-    for d in [Direction::Up, Direction::Right, Direction::Down, Direction::Left, Direction::Neutral] {
+    for d in [
+        Direction::Up,
+        Direction::Right,
+        Direction::Down,
+        Direction::Left,
+        Direction::Neutral,
+    ] {
         let obs = IntentObservation::new_direction(ts, d, 32768, 0, [0; 8]);
         assert_eq!(obs.kind(), IntentKind::Direction(d));
     }
-    for q in [Quality::High, Quality::Moderate, Quality::Low, Quality::NoSignal] {
+    for q in [
+        Quality::High,
+        Quality::Moderate,
+        Quality::Low,
+        Quality::NoSignal,
+    ] {
         let obs = IntentObservation::new_quality(ts, q, 0, [0; 8]);
         assert_eq!(obs.kind(), IntentKind::Quality(q));
     }

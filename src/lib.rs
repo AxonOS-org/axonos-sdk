@@ -81,9 +81,7 @@ pub(crate) mod zerocopy_ext;
 
 pub use capability::{Capability, CapabilitySet, RawCapabilitySet};
 pub use error::{Error, Result};
-pub use intent::{
-    Direction, IntentKind, IntentObservation, Load, Quality,
-};
+pub use intent::{Direction, IntentKind, IntentObservation, Load, Quality};
 pub use manifest::{Manifest, ManifestBuilder};
 pub use mesh::{ConsentScope, MeshClientStub, WithdrawReason};
 pub use stream::{IntentStream, ObservationFilter, OverflowPolicy, Subscription};

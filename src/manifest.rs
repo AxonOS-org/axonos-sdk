@@ -212,7 +212,8 @@ mod tests {
     #[test]
     fn minimal_valid_manifest() {
         let m = Manifest::builder()
-            .app_id("com.example.a").unwrap()
+            .app_id("com.example.a")
+            .unwrap()
             .capability(Capability::Navigation)
             .max_rate_hz(10)
             .build()
@@ -247,7 +248,8 @@ mod tests {
     #[test]
     fn no_capabilities_rejected() {
         let r = Manifest::builder()
-            .app_id("com.a").unwrap()
+            .app_id("com.a")
+            .unwrap()
             .max_rate_hz(1)
             .build();
         assert!(matches!(
@@ -261,7 +263,8 @@ mod tests {
     #[test]
     fn zero_rate_rejected() {
         let r = Manifest::builder()
-            .app_id("com.a").unwrap()
+            .app_id("com.a")
+            .unwrap()
             .capability(Capability::Navigation)
             .max_rate_hz(0)
             .build();
@@ -277,7 +280,8 @@ mod tests {
     fn rate_exceeding_kernel_limit_rejected() {
         // WorkloadAdvisory cap is 1 Hz, request 10 Hz → reject
         let r = Manifest::builder()
-            .app_id("com.a").unwrap()
+            .app_id("com.a")
+            .unwrap()
             .capability(Capability::WorkloadAdvisory)
             .max_rate_hz(10)
             .build();
@@ -292,12 +296,15 @@ mod tests {
     #[test]
     fn full_builder_chain() {
         let m = Manifest::builder()
-            .app_id("com.ergonomic.test").unwrap()
-            .name("Test App").unwrap()
-            .vendor("AxonOS").unwrap()
+            .app_id("com.ergonomic.test")
+            .unwrap()
+            .name("Test App")
+            .unwrap()
+            .vendor("AxonOS")
+            .unwrap()
             .capability(Capability::Navigation)
             .capability(Capability::SessionQuality)
-            .max_rate_hz(2)  // limited by SessionQuality (2 Hz)
+            .max_rate_hz(2) // limited by SessionQuality (2 Hz)
             .build()
             .unwrap();
         assert_eq!(m.name(), Some("Test App"));

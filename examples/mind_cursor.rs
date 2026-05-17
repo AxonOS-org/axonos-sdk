@@ -16,7 +16,10 @@ const SMOOTHING: f32 = 0.3;
 const STEP_PX: f32 = 8.0;
 
 #[derive(Default, Debug, Clone, Copy)]
-struct Cursor { x: f32, y: f32 }
+struct Cursor {
+    x: f32,
+    y: f32,
+}
 
 impl Cursor {
     fn apply(&mut self, dx: f32, dy: f32) {
@@ -63,8 +66,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cursor = Cursor::default();
 
     println!("Mind Cursor — 5 observations");
-    println!("Threshold: {} raw (~{:.0}%)", CONFIDENCE_THRESHOLD_RAW,
-        (CONFIDENCE_THRESHOLD_RAW as f32 / 65535.0) * 100.0);
+    println!(
+        "Threshold: {} raw (~{:.0}%)",
+        CONFIDENCE_THRESHOLD_RAW,
+        (CONFIDENCE_THRESHOLD_RAW as f32 / 65535.0) * 100.0
+    );
     println!();
 
     for i in 0..5 {
@@ -74,7 +80,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let (dx, dy) = direction_vector(d);
                 if passes {
                     cursor.apply(dx, dy);
-                    println!("#{i}: {:?} [raw={}] → ({:.1}, {:.1})", d, obs.confidence_raw(), cursor.x, cursor.y);
+                    println!(
+                        "#{i}: {:?} [raw={}] → ({:.1}, {:.1})",
+                        d,
+                        obs.confidence_raw(),
+                        cursor.x,
+                        cursor.y
+                    );
                 } else {
                     println!("#{i}: {:?} [raw={}] filtered", d, obs.confidence_raw());
                 }
