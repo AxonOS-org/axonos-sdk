@@ -1,4 +1,4 @@
-# Changelog
+# Notable changes
 
 All notable changes to `axonos-sdk` are documented in this file.
 
@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.4.0] — 2026-05-13
+## 2026-05-13 — Security audit hardening (breaking changes)
 
-### Breaking changes (security audit)
+### Summary
 
 - **`ManifestBuilder` setters return `Result<Self, Error>` instead of panicking.**
   `assert!` on input length has been replaced with `Err(ManifestRejected::Malformed)`.
@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.0] — 2026-04-22
+## 2026-04-22 — Production-hardening release
 
 - Production-hardened SDK release.
 - `#![deny(unsafe_code)]` enforced.
@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0] — 2026-04-15
+## 2026-04-15 — Initial public release
 
 - Initial public release.
 - Capability declarations, typed intent events, consent integration.

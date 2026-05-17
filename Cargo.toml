@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 [package]
 name = "axonos-sdk"
-version = "0.4.0"
+version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.75"
 authors = ["Denis Yermakou <denis@axonos.org>"]
 license = "Apache-2.0 OR MIT"
 description = "Hardened BCI SDK — typed intent events, capability declarations, and AxonOS Consent Protocol integration."
 documentation = "https://docs.rs/axonos-sdk"
-repository = "https://github.com/AxonOS-org/axonos-sdk"
+repository = "https://github.com/AxonOS-org/AxonOS-sdk"
 homepage = "https://axonos.org"
 readme = "README.md"
 keywords = ["bci", "neurotech", "embedded", "consent", "no-std"]

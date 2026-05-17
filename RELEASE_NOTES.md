@@ -1,4 +1,4 @@
-# Release Notes — axonos-sdk 0.4.0
+# Recent release notes — axonos-sdk
 
 Release date: 2026-05-13
 
@@ -112,7 +112,7 @@ solely to the AxonOS Consent Protocol (ACP), specified in
 
 ## Migration guide
 
-| 0.3.x                              | 0.4.0                                    |
+| Previous API                       | Current API                              |
 |:-----------------------------------|:-----------------------------------------|
 | `.app_id("…")`                     | `.app_id("…")?`                          |
 | `.name("…")`                       | `.name("…")?`                            |
@@ -155,9 +155,9 @@ previously returned bare.
 
 ## Audit history
 
-- **0.4.0 (May 2026):** Independent Rust security audit, 14 items
+- **May 2026:** Independent Rust security audit, 14 items
   resolved.
-- **0.3.0 (April 2026):** Independent security audits (0.1.0–0.2.0)
+- **April 2026:** Independent security audits (0.1.0–0.2.0)
   Critical and High findings resolved.
 
 ---

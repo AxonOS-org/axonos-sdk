@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// Copyright (c) 2026 Denis Yermakou / AxonOS
+// Copyright (c) 2026 Denis Yermakou <denis@axonos.org>
+// Part of the AxonOS project — https://github.com/AxonOS-org
 //
-// Release 0.4.0 — Security-Audit-Hardened BCI SDK
+// Security-audit-hardened BCI SDK
 //   - compile_error! on unimplemented security paths (no runtime surprises)
 //   - Mutex poison recovery (no panic in sync primitives)
 //   - Explicit stub naming (MeshClientStub)
@@ -14,11 +15,6 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![warn(rust_2018_idioms)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
-#![allow(clippy::must_use_candidate)]
-#![allow(clippy::missing_errors_in_doc)]
-#![allow(clippy::missing_panics_doc)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! # AxonOS SDK

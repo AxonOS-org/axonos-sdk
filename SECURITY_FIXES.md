@@ -1,8 +1,8 @@
-# Security Fixes — axonos-sdk 0.3.0
+# Security audit notes — axonos-sdk
 
 ## Audit Reference
 - **Auditors:** Independent Rust security review (2026-05-07) + embedded/BCI engineer review
-- **Scope:** Full source tree, all commits through 0.2.0
+- **Scope:** Full source tree as of audit date
 - **Threat Model:** AxonOS SDK at application/kernel boundary. Compromise must not extract raw EEG, forge observations, or prevent consent-withdraw from reaching hardware interlock.
 
 ## Finding → Fix Mapping
