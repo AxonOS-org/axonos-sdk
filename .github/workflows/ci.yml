@@ -1,0 +1,142 @@
+# AxonOS SDK — Continuous Integration
+#
+# All known fixes from sister-repo (AxonOS-kernel) applied:
+#   - timeout-minutes on every job
+#   - continue-on-error on miri/optional
+#   - cargo-deny: action v1 (v2 incompatible with cargo-deny 0.15+)
+#   - explicit --target for embedded builds
+#   - Swatinem/rust-cache on heavy jobs
+#   - concurrency cancellation on new push
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── 1. Tests across three host operating systems ─────────────────────────
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test --all-features
+        run: cargo test --all-features
+
+  # ── 2. Format check ───────────────────────────────────────────────────────
+  fmt:
+    name: rustfmt --check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  # ── 3. Clippy ─────────────────────────────────────────────────────────────
+  clippy:
+    name: clippy -D warnings
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ── 4. MSRV pin (1.75) ────────────────────────────────────────────────────
+  msrv:
+    name: MSRV (1.75)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-features
+
+  # ── 5. no_std build on Cortex-M targets ──────────────────────────────────
+  no-std:
+    name: no_std (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - thumbv7em-none-eabihf
+          - thumbv8m.main-none-eabihf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo build --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} --no-default-features
+
+  # ── 6. Documentation build ───────────────────────────────────────────────
+  docs:
+    name: docs -D rustdoc warnings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --no-deps --all-features
+
+  # ── 7. Miri (UB detection on host) ───────────────────────────────────────
+  # SDK is #![deny(unsafe_code)] so this should be a no-op formally, but
+  # miri runs catch UB in dependencies too.
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: miri test
+        run: cargo miri test --all-features
+
+  # ── 8. cargo-deny (licence + advisory + bans audit) ──────────────────────
+  # Pinned to v1: v2 has compatibility issues with cargo-deny 0.15+.
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check bans licenses sources
