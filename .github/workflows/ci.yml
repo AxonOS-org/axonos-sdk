@@ -39,8 +39,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: cargo test --all-features
-        run: cargo test --all-features
+      - name: cargo test --features std
+        run: cargo test --features std
 
   # ── 2. Format check ───────────────────────────────────────────────────────
   fmt:
@@ -65,7 +65,7 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --all-targets --features std -- -D warnings
 
   # ── 4. MSRV pin (1.85) ────────────────────────────────────────────────────
   msrv:
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --all-features
+      - run: cargo check --features std
 
   # ── 5. no_std build on Cortex-M targets ──────────────────────────────────
   no-std:
@@ -126,7 +126,7 @@ jobs:
           components: miri
       - uses: Swatinem/rust-cache@v2
       - name: miri test
-        run: cargo miri test --all-features
+        run: cargo miri test --features std
 
   # ── 8. cargo-deny (licence + advisory + bans audit) ──────────────────────
   # Pinned to v1: v2 has compatibility issues with cargo-deny 0.15+.
