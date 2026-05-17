@@ -87,7 +87,7 @@ impl MeshClientStub {
     /// # Current behavior
     /// No-op. Returns `Ok(())` unconditionally.
     pub fn withdraw_consent(&self, scope: ConsentScope, reason: WithdrawReason) -> Result<()> {
-        let _ = (scope, reason);
+        drop((scope, reason));
         Ok(())
     }
 
@@ -96,7 +96,7 @@ impl MeshClientStub {
     /// # Current behavior
     /// No-op. Returns `Ok(())` unconditionally.
     pub fn suspend_consent(&self, scope: ConsentScope) -> Result<()> {
-        let _ = scope;
+        drop(scope);
         Ok(())
     }
 
@@ -105,7 +105,7 @@ impl MeshClientStub {
     /// # Current behavior
     /// No-op. Returns `Ok(())` unconditionally.
     pub fn resume_consent(&self, scope: ConsentScope) -> Result<()> {
-        let _ = scope;
+        drop(scope);
         Ok(())
     }
 }

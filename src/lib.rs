@@ -70,7 +70,6 @@ pub mod time;
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-#[cfg(feature = "std")]
 pub mod host;
 
 // Audited unsafe module for future zero-copy IPC. Currently empty.

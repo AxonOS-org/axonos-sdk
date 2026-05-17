@@ -165,6 +165,7 @@ impl InMemoryFixture {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
     use super::*;
     use crate::time::MonotonicTimestamp;
     use crate::{Capability, Direction, Manifest};
@@ -180,6 +181,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn connect_without_fixture_returns_transport_error() {
         let _ = InMemoryFixture::uninstall();
         let m = test_manifest();
@@ -193,6 +195,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn connect_with_fixture_succeeds() {
         let mut fx = InMemoryFixture::new();
         let ts = MonotonicTimestamp::from_micros_unchecked(100);
@@ -213,6 +216,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn endpoint_env_override_returns_owned_cow() {
         std::env::set_var(ENDPOINT_ENV, "/tmp/test.sock");
         let ep = resolve_endpoint();
@@ -222,6 +226,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn endpoint_default_returns_borrowed_cow() {
         std::env::remove_var(ENDPOINT_ENV);
         let ep = resolve_endpoint();
