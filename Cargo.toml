@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 [package]
 name = "axonos-sdk"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.85"
 authors = ["Denis Yermakou <denis@axonos.org>"]
 license = "Apache-2.0 OR MIT"
 description = "Hardened BCI SDK — typed intent events, capability declarations, and AxonOS Consent Protocol integration."

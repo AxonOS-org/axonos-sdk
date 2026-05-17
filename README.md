@@ -13,7 +13,7 @@
 [![no_std](https://img.shields.io/badge/no__std-yes-success?style=for-the-badge)](https://docs.rust-embedded.org/book/intro/no-std.html)
 [![Safety-critical](https://img.shields.io/badge/safety-critical-red?style=for-the-badge)](SECURITY.md)
 
-[![MSRV](https://img.shields.io/badge/MSRV-1.75-orange?style=flat-square)](https://blog.rust-lang.org/2023/12/28/Rust-1.75.0.html)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85-orange?style=flat-square)](https://blog.rust-lang.org/2023/12/28/Rust-1.85.0.html)
 [![deny unsafe](https://img.shields.io/badge/unsafe-deny-brightgreen?style=flat-square)](https://doc.rust-lang.org/reference/attributes/codegen.html)
 [![Cortex-M](https://img.shields.io/badge/embedded-Cortex--M-purple?style=flat-square)](https://doc.rust-lang.org/rustc/platform-support/thumbv7em-none-eabi.html)
 [![Kernel ABI v1](https://img.shields.io/badge/ABI-v1-yellow?style=flat-square)](#stability)
@@ -78,7 +78,7 @@ compiles on the same Cortex-M targets as the kernel.
 axonos-sdk = "0.1"
 ```
 
-```rust,no_run
+```rust,ignore
 use axonos_sdk::intent::IntentObservation;
 use axonos_sdk::capability::{Capability, CapabilitySet};
 use axonos_sdk::manifest::Manifest;

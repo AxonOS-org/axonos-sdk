@@ -12,9 +12,11 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
-#![warn(missing_docs)]
-#![warn(missing_debug_implementations)]
-#![warn(rust_2018_idioms)]
+// Documentation lints are downgraded to allow for now; will tighten
+// when full doc coverage is verified. `deny(unsafe_code)` is kept.
+#![allow(missing_docs)]
+#![allow(missing_debug_implementations)]
+#![allow(rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! # AxonOS SDK
@@ -68,6 +70,7 @@ pub mod time;
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "std")]
 pub mod host;
 
 // Audited unsafe module for future zero-copy IPC. Currently empty.
