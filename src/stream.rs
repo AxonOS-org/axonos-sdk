@@ -25,7 +25,8 @@ pub const DEFAULT_BUFFER_CAPACITY: usize = 256;
 
 /// Subscription handle. Dropping this ends the subscription.
 ///
-//! # Thread safety
+/// # Thread safety
+///
 /// `Subscription` is `!Send + !Sync` because the underlying kernel
 /// subscription may be bound to a specific thread or interrupt context.
 #[derive(Debug)]
