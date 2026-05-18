@@ -645,4 +645,3 @@ mod tests {
         assert!(two_caps.is_subset_of(CapabilitySet::all()));
     }
 }
-

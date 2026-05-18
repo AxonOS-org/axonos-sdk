@@ -6,6 +6,48 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [v0.3.4] — 2026-05-18
+
+Pure CI-fix release. No code or API changes.
+
+### Fixed — double trailing newlines in 13 source files
+
+In v0.3.1, a defensive "ensure EOF newline" script had inverted-logic
+that added an additional newline to files that already ended with one,
+creating two trailing newlines. `cargo fmt --check` flagged this in CI.
+
+```diff
+ fn last_test() {
+     assert_eq!(...);
+ }
+-
+ 
+```
+(rustfmt wants exactly one blank line after the last `}`, not two.)
+
+Affected files (now corrected):
+- `src/capability.rs`, `src/error.rs`, `src/ffi.rs`, `src/host.rs`,
+  `src/intent.rs`, `src/lib.rs`, `src/manifest.rs`, `src/mesh.rs`,
+  `src/stream.rs`, `src/telemetry.rs`, `src/time.rs`,
+  `src/zerocopy_ext.rs`, `benches/intent_throughput.rs`
+
+All 13 files now have exactly one trailing newline as rustfmt expects.
+
+### Verified
+
+A byte-level check confirms each file ends with exactly one `\n`:
+
+```python
+data.rstrip(b'\n') + b'\n'   # idempotent: one and only one trailing LF
+```
+
+### Notes
+
+- No source-code changes (only EOF byte normalisation).
+- No API surface changes.
+- KERNEL_ABI_VERSION unchanged (= 1).
+
+
 ## [v0.3.3] — 2026-05-18
 
 Automation release — tag pushes now produce real GitHub Releases.

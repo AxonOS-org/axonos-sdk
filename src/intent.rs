@@ -450,4 +450,3 @@ mod tests {
         assert_eq!(obs.timestamp().as_micros(), 1234);
     }
 }
-

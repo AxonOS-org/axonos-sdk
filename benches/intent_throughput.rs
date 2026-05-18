@@ -73,4 +73,3 @@ criterion_group!(
     bench_monotonic_timestamp_ops,
 );
 criterion_main!(benches);
-
