@@ -106,7 +106,10 @@ mod tests {
     fn version_constants() {
         assert!(!VERSION.is_empty());
         assert!(!CONSENT_PROTOCOL_VERSION.is_empty());
-        assert!(KERNEL_ABI_VERSION >= 1);
+        // KERNEL_ABI_VERSION is a u32 const — runtime assertion would be
+        // a clippy::assertions_on_constants lint. Use a const-block instead,
+        // which evaluates at compile time and produces no runtime code.
+        const _: () = assert!(KERNEL_ABI_VERSION >= 1);
     }
 
     #[test]

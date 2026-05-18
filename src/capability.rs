@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(s.iter().len(), 2);
     }
 
-    // ── set operations (v0.3.0) ───────────────────────────────────────────
+    // ── set operations (v0.3.0) ────────────────────────────────────────
 
     #[test]
     fn union_combines_both_sets() {

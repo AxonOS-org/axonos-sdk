@@ -6,6 +6,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [v0.3.1] — 2026-05-18
+
+Bug-fix release addressing 3 CI failures from v0.3.0 push.
+
+### Fixed
+
+- **`clippy::assertions_on_constants`** in `src/lib.rs:109` — replaced
+  `assert!(KERNEL_ABI_VERSION >= 1)` (which clippy 1.95 recognises as
+  always-true since both operands are const) with a `const _: () = assert!(...)`
+  block evaluated at compile time. No runtime code generated; CI passes.
+
+- **`cargo-deny` action v1 → v2** — v1 bundles an older Cargo that cannot
+  parse `edition = "2024"` (which transitive deps like `clap_lex >= 1.1.0`
+  now use). v2 uses the runner's Cargo via `dtolnay/rust-toolchain@stable`,
+  resolving the metadata-download failure.
+
+- **`rustfmt`** — added missing trailing newlines in `src/ffi.rs` and
+  `src/telemetry.rs`, shortened over-100-column section header in
+  `src/capability.rs`. All files now conform to `rustfmt.toml`
+  (`max_width = 100`, `newline_style = "Unix"`).
+
+- **Miri** — was failing as a consequence of the clippy assertion lint
+  propagating through `-D warnings`. With the lib.rs:109 fix, miri compiles
+  cleanly and tests pass.
+
+### Notes
+
+- No API changes since v0.3.0. CapabilitySet set operations API unchanged.
+- KERNEL_ABI_VERSION still = 1.
+- Pure CI-stability release.
+
+
 ## [v0.3.0] — 2026-05-18
 
 First minor-version bump since the v0.1.x stabilisation cycle. Adds set-algebra
