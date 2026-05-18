@@ -104,6 +104,35 @@ impl Capability {
         // Safe: `as_u8() < CAPABILITY_COUNT < 32` (guard below).
         1u32.wrapping_shl(self.as_u8() as u32)
     }
+
+    /// All defined capability variants in discriminant order.
+    ///
+    /// Useful for iteration when the full ordered list is needed —
+    /// e.g. introspection UIs, exhaustive policy evaluation, audit reports.
+    ///
+    /// # Stability
+    ///
+    /// The number of variants is documented as [`CAPABILITY_COUNT`].
+    /// New variants are additions at the end (never reordering), so existing
+    /// indices are stable across minor versions.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use axonos_sdk::Capability;
+    /// let all = Capability::all();
+    /// assert_eq!(all.len(), 4);
+    /// assert_eq!(all[0], Capability::Navigation);
+    /// ```
+    #[must_use]
+    pub const fn all() -> [Self; CAPABILITY_COUNT as usize] {
+        [
+            Self::Navigation,
+            Self::WorkloadAdvisory,
+            Self::SessionQuality,
+            Self::ArtifactEvents,
+        ]
+    }
 }
 
 impl fmt::Display for Capability {
@@ -201,6 +230,37 @@ impl CapabilitySet {
     #[must_use]
     pub const fn as_raw(self) -> RawCapabilitySet {
         RawCapabilitySet(self.0)
+    }
+
+    /// Set containing every defined capability.
+    ///
+    /// Useful for permissive defaults in test fixtures or for checking
+    /// "this manifest declares the maximum-possible capability surface."
+    ///
+    /// # WCET
+    /// Single load — `const` evaluates at compile time, runtime cost is zero.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use axonos_sdk::{Capability, CapabilitySet};
+    /// let all = CapabilitySet::all();
+    /// assert_eq!(all.len(), 4);
+    /// assert!(all.contains(Capability::Navigation));
+    /// assert!(all.contains(Capability::ArtifactEvents));
+    /// ```
+    #[must_use]
+    pub const fn all() -> Self {
+        // Build via bitwise OR of every variant's bit position.
+        // This stays in sync with Capability::all() automatically through
+        // the bit() method, which uses the as_u8 discriminant.
+        let mut bits: u32 = 0;
+        let mut i: u8 = 0;
+        while i < CAPABILITY_COUNT {
+            bits |= 1u32.wrapping_shl(i as u32);
+            i += 1;
+        }
+        Self(bits)
     }
 
     /// Union with another capability set.
@@ -536,4 +596,53 @@ mod tests {
         let c = a.with(Capability::SessionQuality);
         assert!(!a.is_disjoint(c));
     }
+
+    // ── Capability::all + CapabilitySet::all (v0.3.2) ───────────────────
+
+    #[test]
+    fn capability_all_returns_every_variant() {
+        let all = Capability::all();
+        assert_eq!(all.len(), CAPABILITY_COUNT as usize);
+        assert_eq!(all[0], Capability::Navigation);
+        assert_eq!(all[1], Capability::WorkloadAdvisory);
+        assert_eq!(all[2], Capability::SessionQuality);
+        assert_eq!(all[3], Capability::ArtifactEvents);
+    }
+
+    #[test]
+    fn capability_all_is_in_discriminant_order() {
+        for (i, c) in Capability::all().iter().enumerate() {
+            assert_eq!(c.as_u8() as usize, i);
+        }
+    }
+
+    #[test]
+    fn capabilityset_all_contains_every_variant() {
+        let all = CapabilitySet::all();
+        for c in Capability::all() {
+            assert!(all.contains(c), "missing capability: {:?}", c);
+        }
+        assert_eq!(all.len(), CAPABILITY_COUNT as u32);
+    }
+
+    #[test]
+    fn capabilityset_all_equals_union_of_individuals() {
+        let manual = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::WorkloadAdvisory)
+            .with(Capability::SessionQuality)
+            .with(Capability::ArtifactEvents);
+        assert_eq!(CapabilitySet::all().as_raw(), manual.as_raw());
+    }
+
+    #[test]
+    fn capabilityset_all_superset_of_any_subset() {
+        let any_subset = CapabilitySet::new().with(Capability::Navigation);
+        assert!(any_subset.is_subset_of(CapabilitySet::all()));
+        let two_caps = CapabilitySet::new()
+            .with(Capability::Navigation)
+            .with(Capability::SessionQuality);
+        assert!(two_caps.is_subset_of(CapabilitySet::all()));
+    }
 }
+

@@ -114,11 +114,17 @@ jobs:
   # ── 7. Miri (UB detection on host) ───────────────────────────────────────
   # SDK is #![deny(unsafe_code)] so this should be a no-op formally, but
   # miri runs catch UB in dependencies too.
+  #
+  # MIRIFLAGS=-Zmiri-ignore-leaks: InMemoryFixture in src/host.rs uses
+  # global state (Mutex<Option<...>>) which miri reports as leaks at
+  # process exit. This is deliberate (test-only fixture) and not a UB.
   miri:
     name: miri
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
+    env:
+      MIRIFLAGS: -Zmiri-ignore-leaks
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

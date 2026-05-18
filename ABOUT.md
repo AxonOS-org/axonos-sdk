@@ -61,7 +61,7 @@ without owning the substrate.
   Rust API may evolve.
 - **Tests:** Host-side unit tests, conformance vectors against the
   kernel's `axonos-intent` crate.
-- **ABI version:** v1, compatible with `axonos-kernel ≥ 0.1.6`.
+- **ABI version:** v1 (KERNEL_ABI_VERSION constant), compatible with `axonos-kernel ≥ 0.1.9`.
 - **Integration:** Phase 2 (Q3 2026) — full integration with the
   reference firmware on STM32F407.
 

@@ -117,3 +117,4 @@ mod tests {
         assert_eq!(CONFIDENCE_DENOM, 65535);
     }
 }
+

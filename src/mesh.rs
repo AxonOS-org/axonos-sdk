@@ -137,3 +137,4 @@ mod tests {
         assert_eq!(c.session_id(), 0xDEAD_BEEF);
     }
 }
+

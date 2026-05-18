@@ -165,10 +165,10 @@ impl InMemoryFixture {
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
     use super::*;
     use crate::time::MonotonicTimestamp;
     use crate::{Capability, Direction, Manifest};
+    use serial_test::serial;
 
     fn test_manifest() -> Manifest {
         Manifest::builder()
@@ -233,3 +233,4 @@ mod tests {
         assert!(matches!(ep, Cow::Borrowed(_)));
     }
 }
+

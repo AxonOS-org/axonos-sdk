@@ -6,6 +6,121 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [v0.3.3] — 2026-05-18
+
+Automation release — tag pushes now produce real GitHub Releases.
+
+### Added — auto-release workflow
+
+New `.github/workflows/release.yml` triggers on every `v*.*.*` tag push
+and creates a proper GitHub Release with:
+
+- **Title:** the tag (e.g. `v0.3.3`)
+- **Body:** the matching CHANGELOG section, extracted automatically via
+  awk script that captures everything between `## [vX.Y.Z]` and the
+  next version header
+- **Latest banner:** stable releases (no pre-release suffix) get the
+  green `Latest` badge on the repo page
+- **Pre-releases:** tags with `-rc`, `-beta`, `-alpha` suffixes are
+  marked as `Pre-release` automatically (no `Latest` banner)
+- **Attached assets:** source `.tar.gz` and `.zip` archives built with
+  `git archive` (clean, no `target/` or `.git/`)
+- **Install hint:** auto-generated Cargo.toml snippet in the release body
+
+### Before vs after
+
+| Before this release | After |
+|:---|:---|
+| Tag appears as plain "N tags" link in repo header | Tag appears as **green Latest banner** with release name |
+| No release notes | CHANGELOG section extracted as release body |
+| No downloadable assets | `.tar.gz` + `.zip` attached |
+| No prerelease distinction | `-rc`, `-beta` auto-marked as pre-release |
+
+### How to use
+
+```sh
+# Same workflow as before — just tag and push
+git tag -a v0.3.3 -m "v0.3.3: auto-release workflow"
+git push origin v0.3.3
+# Wait ~30 seconds → GitHub Actions creates the Release automatically
+```
+
+The release will appear at:
+`https://github.com/AxonOS-org/axonos-sdk/releases/tag/v0.3.3`
+
+### Notes
+
+- Workflow requires `contents: write` permission (granted by repo default).
+- No code changes — pure tooling addition.
+- Existing tags (v0.3.0, v0.3.1, v0.3.2) **do not** retroactively get
+  Releases. To backfill: re-push them as `v0.3.0` etc. (or create
+  Releases manually in the GitHub UI).
+
+
+## [v0.3.2] — 2026-05-18
+
+CI stabilisation + new convenience API for capability enumeration.
+
+### Added — `Capability::all()` and `CapabilitySet::all()`
+
+Two complementary `const fn` methods for enumerating every defined capability.
+Useful for permissive defaults, introspection UIs, and exhaustive policy checks.
+
+```rust
+use axonos_sdk::{Capability, CapabilitySet};
+
+// Array of every variant in discriminant order
+let all_variants = Capability::all();
+assert_eq!(all_variants.len(), 4);
+
+// Set containing every variant
+let permissive = CapabilitySet::all();
+assert_eq!(permissive.len(), 4);
+for c in Capability::all() {
+    assert!(permissive.contains(c));
+}
+```
+
+Both methods are `const fn` and zero-allocation. `Capability::all()`
+returns `[Self; CAPABILITY_COUNT as usize]` so the size is a compile-time
+constant.
+
+5 new unit tests cover: discriminant ordering, equivalence with manual
+union, superset relation, length invariant.
+
+`capability.rs` test count: 20 → 25.
+
+### Fixed — rustfmt import ordering in `host.rs`
+
+`use serial_test::serial` was placed before `use super::*`, which violates
+rustfmt's `reorder_imports = true` convention (super/crate first, then
+external crates). Reordered to make `cargo fmt --check` green.
+
+### Fixed — miri leak detection on `InMemoryFixture`
+
+The CI workflow now runs miri with `MIRIFLAGS=-Zmiri-ignore-leaks`. The
+`InMemoryFixture` global state (a `Mutex<Option<...>>` for thread-safe
+test isolation) is correctly reported as leaked at process exit by miri,
+but this is **deliberate test-only state**, not a memory-safety issue.
+
+The fix is environment-level (CI workflow), not source code. The fixture
+implementation is unchanged.
+
+### Documentation consistency
+
+- `README.md` line 124: bumped axonos-sdk ABI compatibility floor from
+  `≥ 0.1.0` to `≥ 0.3.0`.
+- `ABOUT.md` line 64: pointed kernel compatibility at `≥ 0.1.9` (the
+  current published kernel version) and clarified that the v1 ABI
+  number lives in the `KERNEL_ABI_VERSION` constant.
+
+### Notes
+
+- No API removal. `Capability::all()` and `CapabilitySet::all()` are
+  purely additive.
+- `KERNEL_ABI_VERSION` still `1`. Wire format unchanged.
+
+
 ## [v0.3.1] — 2026-05-18
 
 Bug-fix release addressing 3 CI failures from v0.3.0 push.

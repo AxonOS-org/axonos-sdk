@@ -200,3 +200,4 @@ mod tests {
         assert_eq!(Error::AttestationFailed.code() as u16, 0x0402);
     }
 }
+

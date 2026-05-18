@@ -1,0 +1,115 @@
+# AxonOS SDK — Auto-release on tag push
+#
+# Triggers when a tag matching `v*.*.*` is pushed (e.g. v0.3.2).
+# Creates a GitHub Release with:
+#   - Title: "v0.3.2 — <first line from CHANGELOG>"
+#   - Body: the matching CHANGELOG section
+#   - Marked as "Latest" (green banner on repo page)
+#   - Tarball attached as downloadable asset
+#
+# After the first run, the repo page will show a green "Latest" banner
+# with the version, replacing the plain "N tags" text.
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'      # v0.3.2, v1.0.0, etc.
+      - 'v*.*.*-*'    # v0.3.2-rc1, v1.0.0-beta, etc. (pre-releases)
+
+permissions:
+  contents: write    # required to create releases
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for changelog extraction
+
+      - name: Extract version from tag
+        id: tag
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUMBER="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_number=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
+          # Detect pre-release suffix (alpha/beta/rc/etc.)
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract CHANGELOG section
+        id: changelog
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          # Pull section between "## [v0.3.2]" and the next "## [v" header.
+          # If CHANGELOG.md is absent or section not found, fall back to a stub.
+          if [ -f CHANGELOG.md ]; then
+            BODY=$(awk -v ver="$VERSION" '
+              $0 ~ "^## \\[" ver "\\]" { capture=1; print; next }
+              capture && /^## \[v[0-9]+\.[0-9]+\.[0-9]+\]/ { exit }
+              capture { print }
+            ' CHANGELOG.md)
+          fi
+
+          if [ -z "$BODY" ]; then
+            BODY="Release $VERSION. See [CHANGELOG.md](./CHANGELOG.md) for full history."
+          fi
+
+          # Heredoc through GITHUB_OUTPUT for multi-line values
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Install via Cargo:**"
+            echo '```toml'
+            echo "axonos-sdk = \"${{ steps.tag.outputs.version_number }}\""
+            echo '```'
+            echo ""
+            echo "**Source archive:** see assets below."
+            echo "**Full changelog:** [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.tag.outputs.version }}/CHANGELOG.md)"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build source tarball
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          ARCHIVE="axonos-sdk-${VERSION}.tar.gz"
+          # Use git archive for clean tarball without target/, .git/, etc.
+          git archive --format=tar.gz \
+            --prefix="axonos-sdk-${{ steps.tag.outputs.version_number }}/" \
+            -o "$ARCHIVE" \
+            "$VERSION"
+          ls -lh "$ARCHIVE"
+          # Also build a zip for Windows users
+          ZIP="axonos-sdk-${VERSION}.zip"
+          git archive --format=zip \
+            --prefix="axonos-sdk-${{ steps.tag.outputs.version_number }}/" \
+            -o "$ZIP" \
+            "$VERSION"
+          ls -lh "$ZIP"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.version }}
+          body: ${{ steps.changelog.outputs.body }}
+          draft: false
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          make_latest: ${{ steps.tag.outputs.prerelease == 'false' && 'true' || 'false' }}
+          files: |
+            axonos-sdk-${{ steps.tag.outputs.version }}.tar.gz
+            axonos-sdk-${{ steps.tag.outputs.version }}.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: false  # we have our own from CHANGELOG

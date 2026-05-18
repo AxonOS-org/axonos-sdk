@@ -121,7 +121,7 @@ ABI compatibility is tracked via `KERNEL_ABI_VERSION`:
 
 | ABI | Kernel | SDK |
 |:---:|:---|:---|
-| **v1** | `axonos-kernel ≥ 0.1.6` | `axonos-sdk ≥ 0.1.0` |
+| **v1** | `axonos-kernel ≥ 0.1.6` | `axonos-sdk ≥ 0.3.0` |
 
 ## Stability
 
