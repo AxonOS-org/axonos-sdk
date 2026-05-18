@@ -273,7 +273,7 @@ impl IntoIterator for CapabilitySet {
     }
 }
 
-impl<'a> IntoIterator for &'a CapabilitySet {
+impl IntoIterator for &CapabilitySet {
     type Item = Capability;
     type IntoIter = CapabilityIter;
     fn into_iter(self) -> Self::IntoIter {

@@ -38,10 +38,10 @@ pub struct Subscription {
 
 /// Internal non-Send type used to enforce thread-affinity.
 #[cfg(feature = "std")]
-struct SubscriptionInner;
+pub(crate) struct SubscriptionInner;
 
 #[cfg(not(feature = "std"))]
-struct SubscriptionInner;
+pub(crate) struct SubscriptionInner;
 
 impl Subscription {
     /// Unique per-session subscription identifier.
@@ -74,25 +74,21 @@ impl SubscriptionId {
 }
 
 /// Policy for buffer overflow handling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum OverflowPolicy {
+    #[default]
     DropOldest,
     DropNewest,
     /// Not recommended — may violate kernel WCET.
     BackPressure,
 }
 
-impl Default for OverflowPolicy {
-    fn default() -> Self {
-        Self::DropOldest
-    }
-}
-
 /// Client-side observation filter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationFilter {
+    #[default]
     All,
     MinConfidence(u16),
     OnlyKind(FilterKind),
@@ -104,19 +100,13 @@ impl ObservationFilter {
         match self {
             Self::All => true,
             Self::MinConfidence(min) => obs.confidence_raw() >= *min,
-            Self::OnlyKind(k) => match (k, obs.kind()) {
+            Self::OnlyKind(k) => matches!(
+                (k, obs.kind()),
                 (FilterKind::Direction, IntentKind::Direction(_))
-                | (FilterKind::Load, IntentKind::Load(_))
-                | (FilterKind::Quality, IntentKind::Quality(_)) => true,
-                _ => false,
-            },
+                    | (FilterKind::Load, IntentKind::Load(_))
+                    | (FilterKind::Quality, IntentKind::Quality(_))
+            ),
         }
-    }
-}
-
-impl Default for ObservationFilter {
-    fn default() -> Self {
-        Self::All
     }
 }
 

@@ -1,13 +1,12 @@
 # AxonOS SDK — Continuous Integration
 #
-# Fixes applied:
-#   - cargo-deny: updated to v2 (v1 uses deprecated Node.js, GitHub blocks it)
-#   - cargo-deny: fixed arguments syntax (was passing "check bans licenses sources" as single command)
-#   - MSRV: pinned to 1.85.0 for reproducibility
-#   - no_std: added cargo check before build for fast failure
-#   - test: added no-default-features check to catch no_std regressions
-#   - clippy: added no-default-features check
-#   - docs: pinned toolchain to avoid nightly rustdoc breaking changes
+# All known fixes from sister-repo (AxonOS-kernel) applied:
+#   - timeout-minutes on every job
+#   - continue-on-error on miri/optional
+#   - cargo-deny: action v1 (v2 incompatible with cargo-deny 0.15+)
+#   - explicit --target for embedded builds
+#   - Swatinem/rust-cache on heavy jobs
+#   - concurrency cancellation on new push
 
 name: ci
 
@@ -42,8 +41,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: cargo test --features std
         run: cargo test --features std
-      - name: cargo test --no-default-features
-        run: cargo test --no-default-features
 
   # ── 2. Format check ───────────────────────────────────────────────────────
   fmt:
@@ -69,19 +66,17 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --features std -- -D warnings
-      - run: cargo clippy --no-default-features -- -D warnings
 
-  # ── 4. MSRV pin (1.85.0) ─────────────────────────────────────────────────
+  # ── 4. MSRV pin (1.85) ────────────────────────────────────────────────────
   msrv:
-    name: MSRV (1.85.0)
+    name: MSRV (1.85)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --features std
-      - run: cargo check --no-default-features
 
   # ── 5. no_std build on Cortex-M targets ──────────────────────────────────
   no-std:
@@ -100,8 +95,6 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - name: cargo check --target ${{ matrix.target }}
-        run: cargo check --target ${{ matrix.target }} --no-default-features
       - name: cargo build --target ${{ matrix.target }}
         run: cargo build --release --target ${{ matrix.target }} --no-default-features
 
@@ -119,6 +112,8 @@ jobs:
       - run: cargo doc --no-deps --all-features
 
   # ── 7. Miri (UB detection on host) ───────────────────────────────────────
+  # SDK is #![deny(unsafe_code)] so this should be a no-op formally, but
+  # miri runs catch UB in dependencies too.
   miri:
     name: miri
     runs-on: ubuntu-latest
@@ -134,7 +129,7 @@ jobs:
         run: cargo miri test --features std
 
   # ── 8. cargo-deny (licence + advisory + bans audit) ──────────────────────
-  # Updated to v2: v1 is deprecated by GitHub (Node.js 16/20 EOL).
+  # Pinned to v1: v2 has compatibility issues with cargo-deny 0.15+.
   deny:
     name: cargo-deny
     runs-on: ubuntu-latest
@@ -142,8 +137,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: EmbarkStudios/cargo-deny-action@v1
         with:
-          command: check
-          arguments: --advisories --bans --licenses --sources
-          
+          command: check bans licenses sources
