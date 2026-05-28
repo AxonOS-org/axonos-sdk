@@ -1,6 +1,6 @@
 # AxonOS SDK — Continuous Integration
 #
-# All known fixes from sister-repo (AxonOS-kernel) applied:
+# All known fixes from sister-repo (axonos-kernel) applied:
 #   - timeout-minutes on every job
 #   - continue-on-error on miri/optional
 #   - cargo-deny: action v2 (uses runner's cargo for edition-2024 support)

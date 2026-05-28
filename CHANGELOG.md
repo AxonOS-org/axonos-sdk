@@ -6,6 +6,69 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [v0.3.5] — 2026-05-28
+
+AxonOS-style refresh and repository hygiene. No public API changes — the
+v0.3.4 source behaviour is preserved; `KERNEL_ABI_VERSION = 1` and the
+frozen RFC-0006 wire format are unchanged. This release brings the
+repository up to the unified AxonOS visual and documentation standard
+applied across the organisation.
+
+### Removed
+
+- **Orphan stub files `src/ffi.rs` and `src/telemetry.rs`** — neither was
+  declared in `lib.rs` (`mod ffi` / `mod telemetry` were absent), so they
+  were never compiled into the crate. They were empty `TODO` placeholders.
+  The C-FFI and telemetry work remains on the Phase 2 roadmap; it is no
+  longer shipped as dead source. The README module table and tree no
+  longer list them.
+- **`RELEASE_NOTES.md`** — duplicated the version history already in this
+  file and the GitHub Releases generated from it by `release.yml`. Its
+  unique "Current limitations" content was folded into the README
+  Stability section.
+
+### Changed
+
+- **`SECURITY_FIXES.md` → `docs/SECURITY-AUDIT.md`** — the independent
+  audit finding→fix record (26 items: AUDIT, HARDCORE, ENG) is preserved
+  in full but moved out of the root, so the root carries a single
+  `SECURITY.md` (the disclosure policy) like every other AxonOS repository.
+- **README** — removed the standalone Ferris mascot image; replaced the
+  mixed badge palette with the canonical AxonOS palette in one style
+  (AxonOS blue `#0a4a8f` for Crate v0.3.5 / Standard v1.0.0 / Kernel ABI v1,
+  Rust canonical orange `#CE422B`, trust green `#0d7a5f` for the
+  unsafe-denied tag, slate `#475569` for licence and metadata). Replaced
+  the "Related" list with a full **Position in the AxonOS stack** table
+  (all seven repositories). Canonical centered footer (Singapore first),
+  decorative emoji removed.
+- **README accuracy fixes** — the repository-structure tree previously
+  listed an `examples/` directory and a `tests/` directory that do not
+  exist, and the removed orphan modules. The tree now reflects the actual
+  tree. The quick-start dependency line was `axonos-sdk = "0.1"` while the
+  crate is on the 0.3 line; corrected to `"0.3"`. The "What this crate
+  gives you" section no longer advertises FFI/Telemetry as if present.
+- **Repository URL case** — `repository` in `Cargo.toml` and
+  `CITATION.cff`, and all in-repo links, corrected from the mis-cased upper-camel forms to the actual lowercase
+  GitHub paths (`axonos-sdk`, `axonos-kernel`)
+  (the Cargo URL is published to crates.io and must be byte-correct).
+- **Author / contact email** — the personal author address and the legacy
+  general-contact address were replaced with the project-canonical
+  `connect@axonos.org` across source headers, manifests, README, NOTICE,
+  the per-crate licence files, and the contributing guide.
+  `security@axonos.org` is unchanged.
+
+### Added
+
+- **`.gitignore`** — Rust hygiene; was missing.
+- **`CITATION.cff`** — already present; version synchronised to 0.3.5.
+
+### Notes
+
+- **No public API or behavioural changes.** Patch bump 0.3.4 → 0.3.5 per
+  SemVer — additive/hygiene only, no new runtime dependency.
+
+---
+
 ## [v0.3.4] — 2026-05-18
 
 Pure CI-fix release. No code or API changes.

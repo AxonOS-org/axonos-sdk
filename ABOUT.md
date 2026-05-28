@@ -3,7 +3,7 @@
 ## What this is
 
 `axonos-sdk` is the **application-side counterpart** to
-[`axonos-kernel`](https://github.com/AxonOS-org/AxonOS-kernel). It is
+[`axonos-kernel`](https://github.com/AxonOS-org/axonos-kernel). It is
 the library an application links against in order to consume intent
 observations emitted by the AxonOS real-time kernel running on a
 microcontroller.
@@ -42,7 +42,7 @@ without owning the substrate.
 ## What it is not
 
 - **It is not the kernel.** The kernel lives in
-  [`axonos-kernel`](https://github.com/AxonOS-org/AxonOS-kernel) and
+  [`axonos-kernel`](https://github.com/AxonOS-org/axonos-kernel) and
   runs on the microcontroller. The SDK runs in your application.
 - **It is not a signal-processing library.** It receives classified
   intent events from the kernel; it does not classify EEG itself.
@@ -72,9 +72,9 @@ preferred way to engage is to read the code, run the examples,
 file an issue or RFC contribution.
 
 - **Security disclosures:** `security@axonos.org`
-- **Technical correspondence:** `info@axonos.org`
+- **Technical correspondence:** `connect@axonos.org`
 - **Partnership / clinical engagement:** `connect@axonos.org`
 
 ---
 
-**Author:** Denis Yermakou · denis@axonos.org · [axonos.org](https://axonos.org)
+**Author:** Denis Yermakou · connect@axonos.org · [axonos.org](https://axonos.org)

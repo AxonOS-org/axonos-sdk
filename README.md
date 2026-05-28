@@ -1,24 +1,23 @@
 <div align="center">
 
-<img src="https://rustacean.net/assets/rustacean-flat-happy.svg" width="120" alt="Ferris, the Rust mascot" />
-
 # axonos-sdk
 
-### the application-side SDK for AxonOS brain–computer interfaces
+### The application-side SDK for AxonOS brain–computer interfaces.
 
-> Typed intent events, capability declarations, AxonOS Consent Protocol integration. `no_std`-capable. `#![deny(unsafe_code)]`. The consumer half of the AxonOS kernel substrate.
+<sub>Typed intent events · capability declarations · AxonOS Consent Protocol integration · `no_std`-capable · `#![deny(unsafe_code)]`</sub>
 
-[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue?style=for-the-badge)](#license)
-[![no_std](https://img.shields.io/badge/no__std-yes-success?style=for-the-badge)](https://docs.rust-embedded.org/book/intro/no-std.html)
-[![Safety-critical](https://img.shields.io/badge/safety-critical-red?style=for-the-badge)](SECURITY.md)
+<br/>
 
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-orange?style=flat-square)](https://blog.rust-lang.org/2023/12/28/Rust-1.85.0.html)
-[![deny unsafe](https://img.shields.io/badge/unsafe-deny-brightgreen?style=flat-square)](https://doc.rust-lang.org/reference/attributes/codegen.html)
-[![Cortex-M](https://img.shields.io/badge/embedded-Cortex--M-purple?style=flat-square)](https://doc.rust-lang.org/rustc/platform-support/thumbv7em-none-eabi.html)
-[![Kernel ABI v1](https://img.shields.io/badge/ABI-v1-yellow?style=flat-square)](#stability)
+[![Crate](https://img.shields.io/badge/Crate-v0.3.5-0a4a8f?style=flat-square)](https://github.com/AxonOS-org/axonos-sdk/releases/tag/v0.3.5)
+[![Standard](https://img.shields.io/badge/Standard-v1.0.0-0a4a8f?style=flat-square)](https://github.com/AxonOS-org/axonos-standard)
+[![Kernel ABI](https://img.shields.io/badge/Kernel%20ABI-v1-0a4a8f?style=flat-square)](#compatibility-with-the-kernel)
+[![Rust](https://img.shields.io/badge/Rust-no__std-CE422B?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Unsafe](https://img.shields.io/badge/Unsafe-denied-0d7a5f?style=flat-square)](#security)
+[![License](https://img.shields.io/badge/License-Apache--2.0%20OR%20MIT-475569?style=flat-square)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85-475569?style=flat-square)](https://blog.rust-lang.org/2023/12/28/Rust-1.85.0.html)
+[![Target](https://img.shields.io/badge/Target-Cortex--M%20%2F%20host-475569?style=flat-square)](https://doc.rust-lang.org/rustc/platform-support/thumbv7em-none-eabi.html)
 
-[**About**](./ABOUT.md) · [**Modules**](#modules) · [**Quick start**](#quick-start) · [**Security**](./SECURITY.md) · [**Contributing**](./CONTRIBUTING.md) · [**License**](#license)
+[**About**](./ABOUT.md) &nbsp;·&nbsp; [**Modules**](#modules) &nbsp;·&nbsp; [**Quick start**](#quick-start) &nbsp;·&nbsp; [**Security**](./SECURITY.md) &nbsp;·&nbsp; [**Contributing**](./CONTRIBUTING.md) &nbsp;·&nbsp; [**License**](#license)
 
 </div>
 
@@ -27,7 +26,7 @@
 ## In one paragraph
 
 `axonos-sdk` is the **application-side counterpart** to
-[`axonos-kernel`](https://github.com/AxonOS-org/AxonOS-kernel). The
+[`axonos-kernel`](https://github.com/AxonOS-org/axonos-kernel). The
 kernel runs the real-time signal pipeline on a Cortex-M microcontroller
 and emits typed intent observations through a strict RFC-0006 wire
 format and a capability gate. The SDK is what an application links to
@@ -50,10 +49,9 @@ compiles on the same Cortex-M targets as the kernel.
   intent observations from an IPC source.
 - **`Host`** — host-side helpers for testing application code without
   a physical Cortex-M board.
-- **`Mesh`** — multi-node coordination primitives matching the
-  `axonos-swarm` protocol (forthcoming).
-- **`Telemetry`** — opt-in, capability-gated EEG/EMG buffer parsing.
-- **`FFI`** — C/C++/Python bindings for non-Rust application code.
+- **`Mesh`** — multi-node coordination primitives (`MeshClientStub`)
+  matching the [`axonos-swarm`](https://github.com/AxonOS-org/axonos-swarm)
+  protocol. Stub client today; full transport tracked for Phase 2.
 
 ## Modules
 
@@ -66,16 +64,14 @@ compiles on the same Cortex-M targets as the kernel.
 | `stream` | Typed observation stream over an IPC source | ✓ |
 | `error` | Exhaustive `SdkError` enum | ✓ |
 | `host` | Host-side test helpers | `std` only |
-| `mesh` | Multi-node coordination | ✓ |
-| `telemetry` | EEG/EMG parsing (stub — Phase 2) | ✓ |
-| `ffi` | C/C++/Python bindings (stub — Phase 2) | `std` only |
-| `zerocopy_ext` | Zero-copy extensions for the IPC buffer | ✓ |
+| `mesh` | Multi-node coordination (`MeshClientStub`) | ✓ |
+| `zerocopy_ext` | Zero-copy IPC helpers (feature-gated, internal) | ✓ |
 
 ## Quick start
 
 ```toml
 [dependencies]
-axonos-sdk = "0.1"
+axonos-sdk = "0.3"
 ```
 
 ```rust,ignore
@@ -110,7 +106,7 @@ if manifest.contains(observation.kind.capability()) {
 
 ## Compatibility with the kernel
 
-The SDK consumes the wire format defined in [`axonos-kernel`](https://github.com/AxonOS-org/AxonOS-kernel)
+The SDK consumes the wire format defined in [`axonos-kernel`](https://github.com/AxonOS-org/axonos-kernel)
 `axonos-intent` crate. Both implement RFC-0006 §4.1 independently — two
 implementations cross-validate one another. The SDK's
 `IntentObservation::decode` and the kernel's
@@ -128,6 +124,16 @@ ABI compatibility is tracked via `KERNEL_ABI_VERSION`:
 This crate is pre-1.0. The wire format (RFC-0006) is **frozen**.
 The Rust API may evolve before 1.0 — breaking changes will be
 documented in [CHANGELOG.md](./CHANGELOG.md).
+
+**Current limitations (honest status):**
+
+- Real kernel transport is not yet wired. `IntentStream::try_next`
+  requires the `kernel-stub` feature (returns `Ok(None)`) until L3
+  validation lands, tracked in RFC-0005 for Q2 2026.
+- L3 oscilloscope-validated WCRT is **pending**. Performance figures in
+  this SDK are stated at L1 or L2 per the validation taxonomy.
+- No same-hardware controlled benchmark against other RTOS platforms
+  has been performed.
 
 ## Security
 
@@ -157,32 +163,31 @@ axonos-sdk/
 ├── README.md                    ← this file
 ├── ABOUT.md                     ← purpose, audience, market
 ├── CONTRIBUTING.md              ← fork in 3 clicks
-├── NOTICE                       ← Apache-2.0 attribution
+├── ENTERPRISE.md                ← commercial support tiers
+├── SECURITY.md                  ← vulnerability-disclosure policy
+├── CHANGELOG.md
+├── CITATION.cff
+├── NOTICE                       ← Apache-2.0 attribution + trademark
 ├── LICENSE-APACHE
 ├── LICENSE-MIT
-├── SECURITY.md                  ← disclosure policy
-├── CHANGELOG.md
 ├── Cargo.toml
-├── .github/workflows/ci.yml
+├── deny.toml · rustfmt.toml
+├── .github/workflows/           ← ci.yml, release.yml
+├── docs/
+│   └── SECURITY-AUDIT.md        ← independent audit finding→fix record
 ├── src/
 │   ├── lib.rs
-│   ├── intent.rs                ← RFC-0006 wire format
-│   ├── capability.rs            ← Capability enum
-│   ├── manifest.rs              ← Manifest builder
+│   ├── intent.rs                ← RFC-0006 wire format, Q0.16 confidence
+│   ├── capability.rs            ← Capability enum, manifest gate
+│   ├── manifest.rs              ← Manifest builder, validation
 │   ├── time.rs                  ← MonotonicTimestamp
 │   ├── stream.rs                ← Typed observation stream
 │   ├── error.rs                 ← SdkError
-│   ├── host.rs                  ← Host-side helpers
-│   ├── mesh.rs                  ← Multi-node coordination
-│   ├── telemetry.rs             ← EEG/EMG (stub)
-│   ├── ffi.rs                   ← C/C++/Python bindings (stub)
-│   └── zerocopy_ext.rs          ← Zero-copy IPC
-├── examples/
-│   ├── bare_metal_no_std.rs
-│   └── mesh_coupling.rs
-├── benches/
-│   └── intent_throughput.rs
-└── tests/
+│   ├── host.rs                  ← Host-side test helpers (std)
+│   ├── mesh.rs                  ← Multi-node coordination (stub client)
+│   └── zerocopy_ext.rs          ← Zero-copy IPC helpers (feature-gated)
+└── benches/
+    └── intent_throughput.rs
 ```
 
 ## License
@@ -196,12 +201,17 @@ See [NOTICE](./NOTICE) for Apache-2.0 required attribution and the
 trademark policy. Contributions are accepted under the inbound = outbound
 model (no separate CLA) — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Related
+## Position in the AxonOS stack
 
-- **[`axonos-kernel`](https://github.com/AxonOS-org/AxonOS-kernel)** —
-  the verifiable kernel substrate. The SDK consumes its wire format.
-- **[`axonos-rfcs`](https://github.com/AxonOS-org/axonos-rfcs)** —
-  engineering specifications (RFC-0001 through RFC-0006).
+| Layer | Repository | Role |
+|---|---|---|
+| Canonical standard | [`axonos-standard`](https://github.com/AxonOS-org/axonos-standard) | Architecture manual, conformance criteria, validation taxonomy |
+| Engineering RFCs | [`axonos-rfcs`](https://github.com/AxonOS-org/axonos-rfcs) | Numbered design proposals (RFC-0001 through RFC-0006) |
+| Kernel substrate | [`axonos-kernel`](https://github.com/AxonOS-org/axonos-kernel) | Real-time pipeline; emits the wire format this SDK consumes |
+| **Application boundary** | **`axonos-sdk`** | Typed intents, manifests, ABI-compatible integration |
+| Consent layer | [`axonos-consent`](https://github.com/AxonOS-org/axonos-consent) | Deterministic consent state machine and stimulation-gating protocol |
+| Mesh coordination | [`axonos-swarm`](https://github.com/AxonOS-org/axonos-swarm) | Distributed timing, co-availability, peer health monitoring |
+
 - **Project website:** [axonos.org](https://axonos.org).
 - **Long-form essays:** [medium.com/@AxonOS](https://medium.com/@AxonOS).
 
@@ -209,10 +219,12 @@ model (no separate CLA) — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 <div align="center">
 
-**Author and maintainer:** Denis Yermakou · [denis@axonos.org](mailto:denis@axonos.org)
+**The AxonOS Project** &nbsp;·&nbsp; [axonos.org](https://axonos.org) &nbsp;·&nbsp; [connect@axonos.org](mailto:connect@axonos.org) &nbsp;·&nbsp; [security@axonos.org](mailto:security@axonos.org)
 
-Zurich · Berlin · Milano · San Mateo · Singapore
+[medium.com/@AxonOS](https://medium.com/@AxonOS) &nbsp;·&nbsp; [github.com/AxonOS-org](https://github.com/AxonOS-org)
 
-<sub>Made with 🦀 and a long real-time tick.</sub>
+<sub>Singapore · Zurich · Berlin · Milano · San Mateo</sub>
+
+<sub>© 2026 Denis Yermakou · `axonos-sdk` v0.3.5</sub>
 
 </div>

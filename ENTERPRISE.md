@@ -69,7 +69,7 @@ Pricing is per engagement. Typical range: $25,000–$60,000 per clinical project
 
 ## How it works
 
-1. **Evaluation period.** Email `info@axonos.org` with a two-paragraph description of your project, your AxonOS integration point, and the problem you need support with. We'll reply within five business days. If we're not the right fit, we'll say so.
+1. **Evaluation period.** Email `connect@axonos.org` with a two-paragraph description of your project, your AxonOS integration point, and the problem you need support with. We'll reply within five business days. If we're not the right fit, we'll say so.
 
 2. **Agreement.** A one-page service agreement is signed by both parties. Term is annual; pricing above. Singapore legal jurisdiction.
 
@@ -99,7 +99,7 @@ All invoices are issued by **AxonOS Pte. Ltd.** (Singapore) or its successor ent
 ## Contact
 
 **Denis Yermakou** — Founder, AxonOS
-**Email:** `info@axonos.org`
+**Email:** `connect@axonos.org`
 **Subject line:** `Enterprise inquiry: <your organization>`
 
 I personally read every inquiry. Expect a reply within five business days; if your question is urgent (an active customer deployment, a regulatory deadline), say so in the first line and it will move to the front of the queue.
@@ -109,5 +109,5 @@ I personally read every inquiry. Expect a reply within five business days; if yo
 <p align="center"><sub>
   <a href="https://axonos.org">axonos.org</a> ·
   <a href="https://medium.com/@AxonOS">medium.com/@AxonOS</a> ·
-  <a href="mailto:info@axonos.org">info@axonos.org</a>
+  <a href="mailto:connect@axonos.org">connect@axonos.org</a>
 </sub></p>
