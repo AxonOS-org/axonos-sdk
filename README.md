@@ -129,7 +129,7 @@ documented in [CHANGELOG.md](./CHANGELOG.md).
 
 - Real kernel transport is not yet wired. `IntentStream::try_next`
   requires the `kernel-stub` feature (returns `Ok(None)`) until L3
-  validation lands, tracked in RFC-0005 for Q2 2026.
+  validation lands, tracked in RFC-0005 — pending an instrumented evaluation-board fixture, which is not yet procured; no date is given because one would be invented.
 - L3 oscilloscope-validated WCRT is **pending**. Performance figures in
   this SDK are stated at L1 or L2 per the validation taxonomy.
 - No same-hardware controlled benchmark against other RTOS platforms
