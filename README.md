@@ -223,8 +223,6 @@ model (no separate CLA) — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 [medium.com/@AxonOS](https://medium.com/@AxonOS) &nbsp;·&nbsp; [github.com/AxonOS-org](https://github.com/AxonOS-org)
 
-<sub>Singapore · Zurich · Berlin · Milano · San Mateo</sub>
-
 <sub>© 2026 Denis Yermakou · `axonos-sdk` v0.3.5</sub>
 
 </div>
