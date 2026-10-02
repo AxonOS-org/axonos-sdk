@@ -16,6 +16,7 @@
 [![License](https://img.shields.io/badge/License-Apache--2.0%20OR%20MIT-475569?style=flat-square)](#license)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-475569?style=flat-square)](https://blog.rust-lang.org/2023/12/28/Rust-1.85.0.html)
 [![Target](https://img.shields.io/badge/Target-Cortex--M%20%2F%20host-475569?style=flat-square)](https://doc.rust-lang.org/rustc/platform-support/thumbv7em-none-eabi.html)
+[![AxonOS Radar](https://img.shields.io/endpoint?url=https%3A%2F%2Faxonos-bci.github.io%2Faxonos-community-radar%2Fbadges%2FAxonOS-org%2Faxonos-sdk.json&style=flat-square)](https://axonos-bci.github.io/axonos-community-radar/)
 
 [**About**](./ABOUT.md) &nbsp;·&nbsp; [**Modules**](#modules) &nbsp;·&nbsp; [**Quick start**](#quick-start) &nbsp;·&nbsp; [**Security**](./SECURITY.md) &nbsp;·&nbsp; [**Contributing**](./CONTRIBUTING.md) &nbsp;·&nbsp; [**License**](#license)
 
