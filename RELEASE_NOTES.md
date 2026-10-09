@@ -162,4 +162,4 @@ previously returned bare.
 
 ---
 
-axonos.org · medium.com/@AxonOS · info@axonos.org
+axonos.org · medium.com/@AxonOS · connect@axonos.org

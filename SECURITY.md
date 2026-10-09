@@ -25,7 +25,7 @@ Please include:
 4. Your assessment of impact: does this affect confidentiality of intent events, integrity of the consent state machine, availability of the stream, or kernel-application isolation?
 5. Whether you have a fix in mind.
 
-You will receive an acknowledgement within 3 business days (Singapore time). If you have not heard back within 5 business days, please email again — inboxes sometimes eat mail.
+You will receive an acknowledgement within 3 business days. If you have not heard back within 5 business days, please email again — inboxes sometimes eat mail.
 
 ## What we commit to
 

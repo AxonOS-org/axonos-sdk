@@ -38,9 +38,10 @@ compiles on the same Cortex-M targets as the kernel.
 
 ## What this crate gives you
 
-- **`IntentObservation`** — the 32-byte, 8-byte-aligned wire record
-  matching kernel RFC-0006. Decode incoming bytes into a typed event;
-  encode synthetic events for testing.
+- **`IntentObservation`** — the 32-byte, 8-byte-aligned in-memory record
+  matching kernel RFC-0006. Construct synthetic events for testing and read
+  their typed kind, timestamp and confidence; decoding from raw wire bytes is
+  not in this crate yet (see *What does not exist yet* below).
 - **`Manifest`** — declare your application's required capability set
   at compile time. The kernel rejects manifests larger than the
   catalogue at construction, so policy mismatches are caught early.
@@ -70,31 +71,50 @@ compiles on the same Cortex-M targets as the kernel.
 
 ## Quick start
 
+`axonos-sdk` is not published on crates.io; depend on a tagged release:
+
 ```toml
 [dependencies]
-axonos-sdk = "0.3"
+axonos-sdk = { git = "https://github.com/AxonOS-org/axonos-sdk", tag = "v0.3.5" }
 ```
 
-```rust,ignore
-use axonos_sdk::intent::IntentObservation;
-use axonos_sdk::capability::{Capability, CapabilitySet};
-use axonos_sdk::manifest::Manifest;
+```rust
+use axonos_sdk::{Capability, Direction, IntentKind, IntentObservation, Manifest, MonotonicTimestamp};
 
-// 1. Declare what your application needs.
-let manifest = Manifest::new(
-    CapabilitySet::singleton(Capability::Navigation)
-        .with(Capability::SessionQuality),
-);
+fn main() -> Result<(), axonos_sdk::Error> {
+    // 1. Declare what your application needs. Nothing else will be granted.
+    let manifest = Manifest::builder()
+        .app_id("com.example.cursor")?
+        .capability(Capability::Navigation)
+        .max_rate_hz(50)
+        .build()?;
+    assert!(manifest.allows(Capability::Navigation));
+    assert!(!manifest.allows(Capability::WorkloadAdvisory));
 
-// 2. Decode an incoming observation from the kernel.
-let bytes: [u8; 32] = receive_from_kernel_ipc();
-let observation = IntentObservation::decode(&bytes)?;
-
-// 3. Check capability before acting on the event.
-if manifest.contains(observation.kind.capability()) {
-    handle_intent(&observation);
+    // 2. Work with the 32-byte observation type. Until the kernel ABI ships,
+    //    observations are constructed locally, e.g. in tests.
+    let obs = IntentObservation::new_direction(
+        MonotonicTimestamp::from_micros_unchecked(1_000),
+        Direction::Up,
+        58_982, // Q0.16 confidence, v / 65535 ≈ 0.90
+        7,
+        [0u8; 8],
+    );
+    if let IntentKind::Direction(d) = obs.kind() {
+        println!("{d:?} @ {} µs, confidence raw {}", obs.timestamp_us(), obs.confidence_raw());
+    }
+    Ok(())
 }
 ```
+
+**What does not exist yet.** There is no transport from a running kernel to
+an application: `IntentStream::connect` (feature `std`) succeeds only against
+the in-memory test fixture, and `IntentStream::try_next` exists only under the
+development-only `kernel-stub` feature, where it always returns `None`. Both
+arrive with the kernel ABI. The SDK also has no decoder from raw wire bytes;
+the byte-exact codec for the RFC-0006 record lives in
+[`axonos-conformance`](https://github.com/AxonOS-org/axonos-conformance) and
+in `axonos-kernel`'s `axonos-intent` crate.
 
 ## Feature flags
 
