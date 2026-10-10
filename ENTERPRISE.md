@@ -17,7 +17,7 @@ If you are a company building BCI hardware or software with commercial obligatio
 
 ## Engagements
 
-Terms and pricing are on request, scoped to your project.
+Each engagement is scoped to your project and agreed in writing before it begins.
 
 ### Foundation
 
